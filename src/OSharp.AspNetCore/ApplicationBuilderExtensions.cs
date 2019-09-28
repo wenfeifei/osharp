@@ -52,5 +52,21 @@ namespace Microsoft.AspNetCore.Builder
                 builder.MapRoute("default", "{controller=Home}/{action=Index}/{id?}");
             });
         }
+
+        /// <summary>
+        /// 添加Endpoint并Area路由支持
+        /// </summary>
+        public static IApplicationBuilder UseEndpointsWithAreaRoute(this IApplicationBuilder app, bool area = true)
+        {
+            return app.UseEndpoints(endpoints =>
+            {
+                if (area)
+                {
+                    endpoints.MapControllerRoute("area", "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+                }
+
+                endpoints.MapDefaultControllerRoute();
+            });
+        }
     }
 }

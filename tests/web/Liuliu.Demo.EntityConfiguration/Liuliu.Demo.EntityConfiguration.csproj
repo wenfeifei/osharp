@@ -1,18 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <Import Project="../../../build/public.netstandard.props" />
+  <Import Project="../../../build/public.netcoreapp.props" />
   <Import Project="../../../build/version.props" />
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netstandard2.0\Liuliu.Demo.EntityConfiguration.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\Liuliu.Demo.EntityConfiguration.xml</DocumentationFile>
     <NoWarn>1701;1702;1591</NoWarn>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Remove="T4\**" />
-    <EmbeddedResource Remove="T4\**" />
-    <None Remove="T4\**" />
-  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\OSharp.EntityFrameworkCore\OSharp.EntityFrameworkCore.csproj" />

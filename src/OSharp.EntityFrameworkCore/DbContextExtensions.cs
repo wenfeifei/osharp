@@ -1,31 +1,24 @@
 ﻿// -----------------------------------------------------------------------
 //  <copyright file="DbContextExtensions.cs" company="OSharp开源团队">
-//      Copyright (c) 2014-2017 OSharp. All rights reserved.
+//      Copyright (c) 2014-2019 OSharp. All rights reserved.
 //  </copyright>
 //  <site>http://www.osharp.org</site>
 //  <last-editor>郭明锋</last-editor>
-//  <last-date>2017-09-20 1:06</last-date>
+//  <last-date>2019-09-28 13:53</last-date>
 // -----------------------------------------------------------------------
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-using OSharp.Audits;
 using OSharp.Collections;
-using OSharp.Core.EntityInfos;
-using OSharp.Core.Functions;
 using OSharp.Data;
-using OSharp.Dependency;
 using OSharp.Exceptions;
 
 
@@ -77,7 +70,8 @@ namespace OSharp.Entity
             {
                 throw new OsharpException($"参数dbContext类型为“{dbContext.GetType()}”，不能转换为 DbContext");
             }
-            return context.Database.ExecuteSqlCommand(new RawSqlString(sql), parameters);
+
+            return context.Database.ExecuteSqlRaw(sql, parameters);
         }
 
         /// <summary>
@@ -89,7 +83,8 @@ namespace OSharp.Entity
             {
                 throw new OsharpException($"参数dbContext类型为“{dbContext.GetType()}”，不能转换为 DbContext");
             }
-            return context.Database.ExecuteSqlCommandAsync(new RawSqlString(sql), parameters);
+
+            return context.Database.ExecuteSqlRawAsync(sql, parameters);
         }
 
         /// <summary>

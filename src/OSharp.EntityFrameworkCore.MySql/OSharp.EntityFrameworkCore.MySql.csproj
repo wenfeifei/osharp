@@ -8,18 +8,21 @@
     <PackageId>OSharpNS.EntityFrameworkCore.MySql</PackageId>
     <Description>OSharp(.NetStandard2.0)数据访问组件，封装EntityFrameworkCore的MySql数据访问功能的实现</Description>
     <Summary>OSharp(.NetStandard2.0)数据访问组件MySql</Summary>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netstandard2.0\OSharp.EntityFrameworkCore.MySql.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\OSharp.EntityFrameworkCore.MySql.xml</DocumentationFile>
+    <OutputPath>bin\Debug\</OutputPath>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <DocumentationFile>bin\Release\netstandard2.0\OSharp.EntityFrameworkCore.MySql.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\OSharp.EntityFrameworkCore.MySql.xml</DocumentationFile>
+    <OutputPath>bin\Release\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="[2.2.0, 3.0)" />
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="2.2.1-preview1-final" />
   </ItemGroup>
 
   <ItemGroup>
