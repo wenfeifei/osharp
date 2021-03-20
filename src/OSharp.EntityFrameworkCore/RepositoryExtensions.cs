@@ -9,7 +9,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 
@@ -17,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 
 using OSharp.Exceptions;
 
+using Z.EntityFramework.Extensions;
 using Z.EntityFramework.Plus;
 
 
@@ -110,17 +110,13 @@ namespace OSharp.Entity
             where TEntity : class, IEntity<TKey>
             where TKey : IEquatable<TKey>
         {
-            IUnitOfWork uow = repository.UnitOfWork;
-            IDbContext dbContext = uow.GetDbContext<TEntity, TKey>();
+            IDbContext dbContext = repository.DbContext;
             if (!(dbContext is DbContext context))
             {
-                throw new OsharpException($"参数dbContext类型为“{dbContext.GetType()}”，不能转换为 DbContext");
+                throw new OsharpException($"参数dbContext类型为 {dbContext.GetType()} ，不能转换为 DbContext");
             }
-#if NETSTANDARD2_1
+
             return context.Set<TEntity>().FromSqlRaw(sql, parameters);
-#else
-            return context.Set<TEntity>().FromSql(new RawSqlString(sql), parameters);
-#endif
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿// -----------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //  <copyright file="TestController.cs" company="OSharp开源团队">
 //      Copyright (c) 2014-2018 OSharp. All rights reserved.
 //  </copyright>
@@ -7,7 +7,6 @@
 //  <last-date>2018-06-27 4:50</last-date>
 // -----------------------------------------------------------------------
 
-using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -24,22 +23,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using OSharp.AspNetCore;
-using OSharp.AspNetCore.Mvc;
 using OSharp.AspNetCore.Mvc.Filters;
 using OSharp.Collections;
 using OSharp.Data;
-using OSharp.Dependency;
-using OSharp.Entity;
-using OSharp.Exceptions;
-using OSharp.Identity;
-using OSharp.Json;
 
 
 namespace Liuliu.Demo.Web.Controllers
 {
     [Description("网站-测试")]
     [ClassFilter]
-    public class TestController : ApiController
+    public class TestController : SiteApiControllerBase
     {
         private readonly UserManager<User> _userManager;
         private readonly IIdentityContract _identityContract;
@@ -81,7 +74,7 @@ namespace Liuliu.Demo.Web.Controllers
 
                 dto = new RegisterDto()
                 {
-                    UserName ="osharp",
+                    UserName = "osharp",
                     Password = "osharp123456",
                     Email = "mf.guo@qq.com",
                     NickName = "测试号",

@@ -10,6 +10,8 @@
 using System;
 using System.Collections.Generic;
 
+using Microsoft.Extensions.DependencyInjection;
+
 using OSharp.Core.Options;
 using OSharp.Core.Packs;
 
@@ -22,19 +24,19 @@ namespace OSharp.Core.Builders
     public interface IOsharpBuilder
     {
         /// <summary>
+        /// 获取 服务集合
+        /// </summary>
+        IServiceCollection Services { get; }
+
+        /// <summary>
         /// 获取 加载的模块集合
         /// </summary>
-        IEnumerable<Type> AddPacks { get; }
+        IEnumerable<OsharpPack> Packs { get; }
 
         /// <summary>
-        /// 获取 排除的模块集合
+        /// 获取 OSharp选项配置
         /// </summary>
-        IEnumerable<Type> ExceptPacks { get; }
-
-        /// <summary>
-        /// 获取 OSharp选项配置委托
-        /// </summary>
-        Action<OsharpOptions> OptionsAction { get; }
+        OsharpOptions Options { get; }
 
         /// <summary>
         /// 添加指定模块
@@ -43,17 +45,10 @@ namespace OSharp.Core.Builders
         IOsharpBuilder AddPack<TPack>() where TPack : OsharpPack;
 
         /// <summary>
-        /// 排除指定模块
+        /// 添加加载的所有Pack，并可排除指定的Pack类型
         /// </summary>
-        /// <typeparam name="TPack"></typeparam>
+        /// <param name="exceptPackTypes">要排除的Pack类型</param>
         /// <returns></returns>
-        IOsharpBuilder ExceptPack<TPack>() where TPack : OsharpPack;
-
-        /// <summary>
-        /// 添加OSharp选项配置
-        /// </summary>
-        /// <param name="optionsAction">OSharp操作选项</param>
-        /// <returns>OSharp构建器</returns>
-        IOsharpBuilder AddOptions(Action<OsharpOptions>optionsAction);
+        IOsharpBuilder AddPacks(params Type[] exceptPackTypes);
     }
 }

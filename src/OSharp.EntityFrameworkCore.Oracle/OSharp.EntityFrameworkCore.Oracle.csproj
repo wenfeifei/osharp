@@ -4,23 +4,26 @@
   <Import Project="../../build/version.props" />
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net5.0</TargetFrameworks>
     <PackageId>OSharpNS.EntityFrameworkCore.Oracle</PackageId>
     <Description>OSharp 数据访问组件，封装EntityFrameworkCore的Oracle数据访问功能的实现</Description>
     <Summary>OSharp 数据访问组件Oracle</Summary>
     <RootNamespace>OSharp.Entity.Oracle</RootNamespace>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|netstandard2.0|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <DocumentationFile>bin\Release\OSharp.EntityFrameworkCore.Oracle.xml</DocumentationFile>
     <OutputPath>bin\Release</OutputPath>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)'=='netstandard2.0'">
-    <PackageReference Include="Citms.EntityFrameworkCore.Oracle" Version="1.0.9" />
+    <PackageReference Include="Oracle.EntityFrameworkCore" Version="3.19.80" />
   </ItemGroup>
-
+  <ItemGroup Condition="'$(TargetFramework)'=='net5.0'">
+    <PackageReference Include="Oracle.EntityFrameworkCore" Version="5.21.1" />
+  </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OSharp.EntityFrameworkCore.MySql\OSharp.EntityFrameworkCore.MySql.csproj" />
     <ProjectReference Include="..\OSharp.EntityFrameworkCore\OSharp.EntityFrameworkCore.csproj" />
   </ItemGroup>
 

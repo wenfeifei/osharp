@@ -9,9 +9,7 @@
 
 using System;
 
-using Microsoft.Extensions.DependencyInjection;
-
-using OSharp.Dependency;
+using OSharp.Reflection;
 
 
 namespace OSharp.EventBuses.Internal
@@ -19,18 +17,15 @@ namespace OSharp.EventBuses.Internal
     /// <summary>
     /// EventBus初始化
     /// </summary>
-    [Dependency(ServiceLifetime.Singleton, TryAdd = true)]
     internal class EventBusBuilder : IEventBusBuilder
     {
-        private readonly IEventHandlerTypeFinder _typeFinder;
         private readonly IEventBus _eventBus;
 
         /// <summary>
         /// 初始化一个<see cref="EventBusBuilder"/>类型的新实例
         /// </summary>
-        public EventBusBuilder(IEventHandlerTypeFinder typeFinder, IEventBus eventBus)
+        public EventBusBuilder(IEventBus eventBus)
         {
-            _typeFinder = typeFinder;
             _eventBus = eventBus;
         }
 
@@ -39,7 +34,7 @@ namespace OSharp.EventBuses.Internal
         /// </summary>
         public void Build()
         {
-            Type[] types = _typeFinder.FindAll(true);
+            Type[] types = AssemblyManager.FindTypesByBase(typeof(IEventHandler<>));
             if (types.Length == 0)
             {
                 return;

@@ -6,6 +6,13 @@
 //  <last-date>2015-07-26 15:26</last-date>
 // -----------------------------------------------------------------------
 
+using System;
+
+#if NETSTANDARD2_0
+using Microsoft.DotNet.PlatformAbstractions;
+#endif
+
+
 namespace OSharp.Filter
 {
     /// <summary>
@@ -87,6 +94,21 @@ namespace OSharp.Filter
                 return false;
             }
             return rule.Field == Field && rule.Value == Value && rule.Operate == Operate;
+        }
+
+        /// <summary>Serves as the default hash function.</summary>
+        /// <returns>A hash code for the current object.</returns>
+        public override int GetHashCode()
+        {
+#if NET5_0
+            return HashCode.Combine(Field, Value, Operate);
+#else
+            var combiner = new HashCodeCombiner();
+            combiner.Add(Field);
+            combiner.Add(Value);
+            combiner.Add(Operate);
+            return combiner.CombinedHash;
+#endif
         }
 
         #endregion

@@ -15,11 +15,11 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
+using OSharp.Authorization.EntityInfos;
+using OSharp.Authorization.Functions;
 using OSharp.Collections;
-using OSharp.Core.EntityInfos;
-using OSharp.Core.Functions;
-using OSharp.Dependency;
 using OSharp.Exceptions;
 using OSharp.Reflection;
 
@@ -29,20 +29,19 @@ namespace OSharp.Entity
     /// <summary>
     /// 实体管理器
     /// </summary>
-    [Dependency(ServiceLifetime.Singleton, TryAdd = true)]
     public class EntityManager : IEntityManager
     {
         private readonly ConcurrentDictionary<Type, IEntityRegister[]> _entityRegistersDict
             = new ConcurrentDictionary<Type, IEntityRegister[]>();
-        private readonly IEntityConfigurationTypeFinder _typeFinder;
+        private readonly ILogger _logger;
         private bool _initialized;
 
         /// <summary>
         /// 初始化一个<see cref="EntityManager"/>类型的新实例
         /// </summary>
-        public EntityManager(IEntityConfigurationTypeFinder typeFinder)
+        public EntityManager(IServiceProvider provider)
         {
-            _typeFinder = typeFinder;
+            _logger = provider.GetLogger<EntityManager>();
         }
 
         /// <summary>
@@ -51,16 +50,18 @@ namespace OSharp.Entity
         public virtual void Initialize()
         {
             var dict = _entityRegistersDict;
-            Type[] types = _typeFinder.FindAll(true);
+            Type[] types = AssemblyManager.FindTypesByBase<IEntityRegister>();
             if (types.Length == 0 || _initialized)
             {
+                _logger.LogDebug("数据库上下文实体已初始化，跳过");
                 return;
             }
 
-            dict.Clear();
+            //创建实体映射类的实例
             List<IEntityRegister> registers = types.Select(type => Activator.CreateInstance(type) as IEntityRegister).ToList();
             List<IGrouping<Type, IEntityRegister>> groups = registers.GroupBy(m => m.DbContextType).ToList();
             Type key;
+            dict.Clear();
             foreach (IGrouping<Type, IEntityRegister> group in groups)
             {
                 key = group.Key ?? typeof(DefaultDbContext);
@@ -77,6 +78,15 @@ namespace OSharp.Entity
                 list.AddIfNotExist(new EntityInfoConfiguration(), m => m.EntityType.IsBaseOn<IEntityInfo>());
                 list.AddIfNotExist(new FunctionConfiguration(), m => m.EntityType.IsBaseOn<IFunction>());
                 dict[key] = list.ToArray();
+            }
+
+            foreach (KeyValuePair<Type, IEntityRegister[]> item in dict)
+            {
+                foreach (IEntityRegister register in item.Value)
+                {
+                    _logger.LogDebug($"数据上下文 {item.Key} 添加实体类型 {register.EntityType} ");
+                }
+                _logger.LogInformation($"数据上下文 {item.Key} 添加了 {item.Value.Length} 个实体");
             }
 
             _initialized = true;
@@ -102,18 +112,19 @@ namespace OSharp.Entity
             var dict = _entityRegistersDict;
             if (dict.Count == 0)
             {
-                throw new OsharpException($"未发现任何数据上下文实体映射配置，请通过对各个实体继承基类“EntityTypeConfigurationBase<TEntity, TKey>”以使实体加载到上下文中");
+                throw new OsharpException("未发现任何数据上下文实体映射配置，请通过对各个实体继承基类“EntityTypeConfigurationBase<TEntity, TKey>”以使实体加载到上下文中");
             }
 
             foreach (var item in _entityRegistersDict)
             {
                 if (item.Value.Any(m => m.EntityType == entityType))
                 {
+                    _logger.LogDebug($"由实体类 {entityType} 获取到所属上下文类型：{item.Key}");
                     return item.Key;
                 }
             }
 
-            throw new OsharpException($"无法获取实体类“{entityType}”的所属上下文类型，请通过继承基类“EntityTypeConfigurationBase<TEntity, TKey>”配置实体加载到上下文中");
+            throw new OsharpException($"无法获取实体类 {entityType} 的所属上下文类型，请通过继承基类“EntityTypeConfigurationBase<TEntity, TKey>”配置实体加载到上下文中");
         }
 
 

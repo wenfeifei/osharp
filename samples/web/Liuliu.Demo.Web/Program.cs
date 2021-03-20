@@ -7,7 +7,8 @@
 //  <last-date>2018-06-27 4:50</last-date>
 // -----------------------------------------------------------------------
 
-using Microsoft.AspNetCore;
+using AspectCore.Extensions.Hosting;
+
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 
@@ -16,8 +17,6 @@ namespace Liuliu.Demo.Web
 {
     public class Program
     {
-
-#if NETCOREAPP3_0
         public static void Main(string[] args)
         {
             CreateHostBuilder(args).Build().Run();
@@ -28,17 +27,6 @@ namespace Liuliu.Demo.Web
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
-                });
-#else
-        public static void Main(string[] args)
-        {
-            CreateWebHostBuilder(args).Build().Run();
-        }
-
-        public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
-            WebHost.CreateDefaultBuilder(args)
-                .UseStartup<Startup>();
-#endif
-
+                }).UseDynamicProxy();
     }
 }

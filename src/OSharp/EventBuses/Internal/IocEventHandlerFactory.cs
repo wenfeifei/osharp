@@ -10,6 +10,7 @@
 using System;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OSharp.Dependency;
 
@@ -21,17 +22,19 @@ namespace OSharp.EventBuses.Internal
     /// </summary>
     internal class IocEventHandlerFactory : IEventHandlerFactory
     {
+        private readonly ILogger _logger;
         private readonly IHybridServiceScopeFactory _serviceScopeFactory;
         private readonly Type _handlerType;
 
         /// <summary>
         /// 初始化一个<see cref="IocEventHandlerFactory"/>类型的新实例
         /// </summary>
-        /// <param name="serviceScopeFactory">服务作用域工厂</param>
+        /// <param name="provider">服务提供者</param>
         /// <param name="handlerType">事件处理器类型</param>
-        public IocEventHandlerFactory(IHybridServiceScopeFactory serviceScopeFactory, Type handlerType)
+        public IocEventHandlerFactory(IServiceProvider provider, Type handlerType)
         {
-            _serviceScopeFactory = serviceScopeFactory;
+            _logger = provider.GetLogger<IocEventHandlerFactory>();
+            _serviceScopeFactory = provider.GetService<IHybridServiceScopeFactory>();
             _handlerType = handlerType;
         }
 
@@ -42,7 +45,16 @@ namespace OSharp.EventBuses.Internal
         public EventHandlerDisposeWrapper GetHandler()
         {
             IServiceScope scope = _serviceScopeFactory.CreateScope();
-            return new EventHandlerDisposeWrapper((IEventHandler)scope.ServiceProvider.GetService(_handlerType), () => scope.Dispose());
+            string token = scope.GetHashCode().ToString();
+            _logger.LogDebug($"创建处理器“{_handlerType}”的执行作用域，作用域标识：{token}");
+            IServiceProvider scopeProvider = scope.ServiceProvider;
+            IEventHandler eventHandler = (IEventHandler)scopeProvider.GetService(_handlerType);
+            _logger.LogDebug($"创建处理器“{_handlerType}”的实例，作用域标识：{token}");
+            return new EventHandlerDisposeWrapper(eventHandler, () =>
+            {
+                scope.Dispose();
+                _logger.LogDebug($"释放处理器“{_handlerType}”的执行作用域，作用域标识： {token}");
+            });
         }
     }
 }

@@ -9,7 +9,6 @@
 
 using System;
 using System.Globalization;
-using System.Linq;
 
 using OSharp.Extensions;
 using OSharp.Properties;
@@ -40,12 +39,12 @@ namespace OSharp.Maths
             ulong result = 0;
             for (int i = 0; i < value.Length; i++)
             {
-                char @char = value[i];
-                if (!baseChar.Contains(@char))
+                string str = value[i].ToString();
+                if (!baseChar.Contains(str))
                 {
-                    throw new ArgumentException(string.Format(Resources.AnyRadixConvert_CharacterIsNotValid, @char, fromRadix));
+                    throw new ArgumentException(string.Format(Resources.AnyRadixConvert_CharacterIsNotValid, str, fromRadix));
                 }
-                result += (ulong)baseChar.IndexOf(@char) * (ulong)Math.Pow(baseChar.Length, value.Length - i - 1);
+                result += (ulong)baseChar.IndexOf(str, StringComparison.Ordinal) * (ulong)Math.Pow(baseChar.Length, value.Length - i - 1);
             }
             return result;
         }

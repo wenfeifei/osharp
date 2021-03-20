@@ -7,7 +7,6 @@
 //  <last-date>2019-09-29 12:43</last-date>
 // -----------------------------------------------------------------------
 
-#if NETCOREAPP3_0
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
@@ -32,7 +31,7 @@ namespace OSharp.AspNetCore.Routing
         /// 获取 模块启动顺序，模块启动的顺序先按级别启动，同一级别内部再按此顺序启动，
         /// 级别默认为0，表示无依赖，需要在同级别有依赖顺序的时候，再重写为>0的顺序值
         /// </summary>
-        public override int Order => 2;
+        public override int Order => 99;
 
         /// <summary>
         /// 应用AspNetCore的服务业务
@@ -55,7 +54,7 @@ namespace OSharp.AspNetCore.Routing
         /// <param name="endpoints">终结点路由配置</param>
         protected virtual IEndpointRouteBuilder MvcEndpoints(IEndpointRouteBuilder endpoints)
         {
-            endpoints.MvcEndpointsWithAreaRoute();
+            endpoints.MapControllersWithAreaRoute();
 
             return endpoints;
         }
@@ -81,4 +80,3 @@ namespace OSharp.AspNetCore.Routing
 
     }
 }
-#endif

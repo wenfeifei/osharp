@@ -1,4 +1,4 @@
-// -----------------------------------------------------------------------
+﻿// -----------------------------------------------------------------------
 //  <copyright file="OSharpOptionsSetup.cs" company="OSharp开源团队">
 //      Copyright (c) 2014-2017 OSharp. All rights reserved.
 //  </copyright>
@@ -12,6 +12,8 @@ using System.Linq;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+
+using OSharp.Collections;
 using OSharp.Entity;
 using OSharp.Exceptions;
 using OSharp.Extensions;
@@ -76,6 +78,22 @@ namespace OSharp.Core.Options
                 options.Jwt = jwt;
             }
 
+            //CookieOptions
+            section = _configuration.GetSection("OSharp:Cookie");
+            CookieOptions cookie = section.Get<CookieOptions>();
+            if (cookie != null)
+            {
+                options.Cookie = cookie;
+            }
+
+            //CorsOptions
+            section = _configuration.GetSection("OSharp:Cors");
+            CorsOptions cors = section.Get<CorsOptions>();
+            if (cors != null)
+            {
+                options.Cors = cors;
+            }
+
             // RedisOptions
             section = _configuration.GetSection("OSharp:Redis");
             RedisOptions redis = section.Get<RedisOptions>();
@@ -93,11 +111,24 @@ namespace OSharp.Core.Options
             SwaggerOptions swagger = section.Get<SwaggerOptions>();
             if (swagger != null)
             {
-                if (swagger.Url.IsMissing())
+                if (swagger.Endpoints.IsNullOrEmpty())
                 {
-                    throw new OsharpException("配置文件中Swagger节点的Url不能为空");
+                    throw new OsharpException("配置文件中Swagger节点的EndPoints不能为空");
+                }
+
+                if (swagger.RoutePrefix == null)
+                {
+                    swagger.RoutePrefix = "swagger";
                 }
                 options.Swagger = swagger;
+            }
+
+            // HttpEncrypt
+            section = _configuration.GetSection("OSharp:HttpEncrypt");
+            HttpEncryptOptions httpEncrypt = section.Get<HttpEncryptOptions>();
+            if (httpEncrypt != null)
+            {
+                options.HttpEncrypt = httpEncrypt;
             }
         }
 

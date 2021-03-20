@@ -1,4 +1,4 @@
-﻿// -----------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //  <copyright file="CommonController.cs" company="OSharp开源团队">
 //      Copyright (c) 2014-2018 OSharp. All rights reserved.
 //  </copyright>
@@ -8,32 +8,22 @@
 // -----------------------------------------------------------------------
 
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Dynamic;
 using System.IO;
 using System.Linq;
-using System.Net.Http.Headers;
 using System.Reflection;
 using System.Threading.Tasks;
-
-using Liuliu.Demo.Common;
-using Liuliu.Demo.Security;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyModel;
 
 using OSharp.AspNetCore;
-using OSharp.AspNetCore.Mvc;
 using OSharp.AspNetCore.UI;
-using OSharp.CodeGenerator;
-using OSharp.Collections;
-using OSharp.Core.Modules;
-using OSharp.Core.Packs;
+using OSharp.Authorization.Modules;
 using OSharp.Data;
 using OSharp.Drawing;
 using OSharp.IO;
@@ -46,14 +36,15 @@ namespace Liuliu.Demo.Web.Controllers
 {
     [Description("网站-通用")]
     [ModuleInfo(Order = 3)]
-    public class CommonController : ApiController
+    //[ApiExplorerSettings(GroupName = "buss")]
+    public class CommonController : SiteApiControllerBase
     {
         private readonly IVerifyCodeService _verifyCodeService;
-        private readonly IHostingEnvironment _environment;
+        private readonly IWebHostEnvironment _environment;
 
         public CommonController(
             IVerifyCodeService verifyCodeService,
-            IHostingEnvironment environment)
+            IWebHostEnvironment environment)
         {
             _verifyCodeService = verifyCodeService;
             _environment = environment;
@@ -77,7 +68,7 @@ namespace Liuliu.Demo.Web.Controllers
                 RandomPosition = true
             };
             Bitmap bitmap = coder.CreateImage(4, out string code);
-            _verifyCodeService.SetCode(code, out string id);
+            string id = _verifyCodeService.SetCode(code);
             return _verifyCodeService.GetImageString(bitmap, id);
         }
 
@@ -128,8 +119,7 @@ namespace Liuliu.Demo.Web.Controllers
             IServiceProvider provider = HttpContext.RequestServices;
 
             dynamic info = new ExpandoObject();
-            IOsharpPackManager packManager = provider.GetService<IOsharpPackManager>();
-            info.Packs = packManager.SourcePacks.OrderBy(m => m.Level).ThenBy(m => m.Order).ThenBy(m => m.GetType().FullName).Select(m => new
+            info.Packs = provider.GetAllPacks().Select(m => new
             {
                 m.GetType().Name,
                 Class = m.GetType().FullName,
@@ -149,56 +139,6 @@ namespace Liuliu.Demo.Web.Controllers
             };
 
             return info;
-        }
-
-        /// <summary>
-        /// 获取分类类型元数据
-        /// </summary>
-        /// <param name="type">类型分类，entity,inputdto,outputdto</param>
-        /// <param name="handler">类型元数据处理器</param>
-        /// <returns></returns>
-        [HttpGet]
-        [ModuleInfo]
-        [Description("获取分类类型元数据")]
-        public TypeMetadata[] GetTypeMetadatas(string type, [FromServices]ITypeMetadataHandler handler)
-        {
-            if (handler == null)
-            {
-                return new TypeMetadata[0];
-            }
-            switch (type?.ToLower())
-            {
-                case "entity":
-                    return handler.GetEntityTypeMetadatas();
-                case "inputdto":
-                    return handler.GetInputDtoMetadatas();
-                case "outputdto":
-                    return handler.GetOutputDtoMetadata();
-            }
-            return new TypeMetadata[0];
-        }
-
-        /// <summary>
-        /// 获取指定类型的元数据
-        /// </summary>
-        /// <param name="typeFullName">类型命名</param>
-        /// <param name="handler">处理器</param>
-        /// <returns>类型元数据</returns>
-        [HttpGet]
-        [ModuleInfo]
-        [Description("获取类型元数据")]
-        public TypeMetadata GeTypeMetadata(string typeFullName, [FromServices] ITypeMetadataHandler handler)
-        {
-            if (handler == null)
-            {
-                return null;
-            }
-            Type type = Type.GetType(typeFullName);
-            if (type == null)
-            {
-                return null;
-            }
-            return handler.GetTypeMetadata(type);
         }
     }
 }

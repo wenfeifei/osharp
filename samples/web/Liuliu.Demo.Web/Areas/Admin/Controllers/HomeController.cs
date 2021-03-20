@@ -9,8 +9,6 @@
 
 using System.ComponentModel;
 
-using Liuliu.Demo.Security;
-
 using Microsoft.AspNetCore.Mvc;
 
 
@@ -19,13 +17,6 @@ namespace Liuliu.Demo.Web.Areas.Admin.Controllers
     [Description("管理-主页")]
     public class HomeController : AdminApiController
     {
-        private readonly SecurityManager _securityManager;
-
-        public HomeController(SecurityManager securityManager)
-        {
-            _securityManager = securityManager;
-        }
-
         /// <summary>
         /// 获取后台管理主菜单
         /// </summary>

@@ -1,10 +1,10 @@
 ﻿// -----------------------------------------------------------------------
 //  <copyright file="EventBusBase.cs" company="OSharp开源团队">
-//      Copyright (c) 2014-2018 OSharp. All rights reserved.
+//      Copyright (c) 2014-2021 OSharp. All rights reserved.
 //  </copyright>
 //  <site>http://www.osharp.org</site>
 //  <last-editor>郭明锋</last-editor>
-//  <last-date>2018-07-01 17:55</last-date>
+//  <last-date>2021-03-16 10:19</last-date>
 // -----------------------------------------------------------------------
 
 using System;
@@ -15,7 +15,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using OSharp.Data;
-using OSharp.Dependency;
 using OSharp.EventBuses.Internal;
 using OSharp.Threading;
 
@@ -32,18 +31,12 @@ namespace OSharp.EventBuses
         /// <summary>
         /// 初始化一个<see cref="EventBusBase"/>类型的新实例
         /// </summary>
-        protected EventBusBase(IHybridServiceScopeFactory serviceScopeFactory, IServiceProvider serviceProvider)
+        protected EventBusBase(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
-            ServiceScopeFactory = serviceScopeFactory;
             EventStore = serviceProvider.GetService<IEventStore>();
             Logger = serviceProvider.GetLogger(GetType());
         }
-        
-        /// <summary>
-        /// 获取 服务作用域工厂
-        /// </summary>
-        protected IHybridServiceScopeFactory ServiceScopeFactory { get; }
 
         /// <summary>
         /// 获取 事件仓储
@@ -103,6 +96,7 @@ namespace OSharp.EventBuses
             Check.NotNull(eventHandler, nameof(eventHandler));
 
             EventStore.Add(eventType, eventHandler);
+            Logger.LogDebug($"创建事件“{eventType}”到处理器“{eventHandler.GetType()}”的订阅配对");
         }
 
         /// <summary>
@@ -120,12 +114,14 @@ namespace OSharp.EventBuses
                 {
                     continue;
                 }
+
                 Type eventDataType = handlerInterface.GetGenericArguments()[0]; //泛型的EventData类型
-                IEventHandlerFactory factory = new IocEventHandlerFactory(ServiceScopeFactory, eventHandlerType);
+                IEventHandlerFactory factory = new IocEventHandlerFactory(_serviceProvider, eventHandlerType);
                 EventStore.Add(eventDataType, factory);
                 Logger.LogDebug($"创建事件“{eventDataType}”到处理器“{eventHandlerType}”的订阅配对");
             }
-            Logger.LogInformation($"共从程序集创建了{eventHandlerTypes.Length}个事件处理器的事件订阅");
+
+            Logger.LogInformation($"共从程序集创建了 {eventHandlerTypes.Length} 个事件处理器的事件订阅");
         }
 
         /// <summary>
@@ -160,6 +156,7 @@ namespace OSharp.EventBuses
         public virtual void Unsubscribe(Type eventType, IEventHandler eventHandler)
         {
             EventStore.Remove(eventType, eventHandler);
+            Logger.LogDebug($"移除事件“{eventType}”到处理器“{eventHandler.GetType()}”的订阅配对");
         }
 
         /// <summary>
@@ -189,10 +186,9 @@ namespace OSharp.EventBuses
         /// </summary>
         /// <typeparam name="TEventData">事件数据类型</typeparam>
         /// <param name="eventData">事件数据</param>
-        /// <param name="wait">是否等待结果返回</param>
-        public virtual void Publish<TEventData>(TEventData eventData, bool wait = true) where TEventData : IEventData
+        public virtual void Publish<TEventData>(TEventData eventData) where TEventData : IEventData
         {
-            Publish<TEventData>(null, eventData, wait);
+            Publish<TEventData>(null, eventData);
         }
 
         /// <summary>
@@ -201,10 +197,9 @@ namespace OSharp.EventBuses
         /// <typeparam name="TEventData">事件数据类型</typeparam>
         /// <param name="eventSource">事件源，触发事件的对象</param>
         /// <param name="eventData">事件数据</param>
-        /// <param name="wait">是否等待结果返回</param>
-        public virtual void Publish<TEventData>(object eventSource, TEventData eventData, bool wait = true) where TEventData : IEventData
+        public virtual void Publish<TEventData>(object eventSource, TEventData eventData) where TEventData : IEventData
         {
-            Publish(typeof(TEventData), eventSource, eventData, wait);
+            Publish(typeof(TEventData), eventSource, eventData);
         }
 
         /// <summary>
@@ -212,10 +207,9 @@ namespace OSharp.EventBuses
         /// </summary>
         /// <param name="eventType">事件数据类型</param>
         /// <param name="eventData">事件数据</param>
-        /// <param name="wait">是否等待结果返回</param>
-        public virtual void Publish(Type eventType, IEventData eventData, bool wait = true)
+        public virtual void Publish(Type eventType, IEventData eventData)
         {
-            Publish(eventType, null, eventData, wait);
+            Publish(eventType, null, eventData);
         }
 
         /// <summary>
@@ -224,19 +218,25 @@ namespace OSharp.EventBuses
         /// <param name="eventType">事件数据类型</param>
         /// <param name="eventSource">事件源，触发事件的对象</param>
         /// <param name="eventData">事件数据</param>
-        /// <param name="wait">是否等待结果返回</param>
-        public virtual void Publish(Type eventType, object eventSource, IEventData eventData, bool wait = true)
+        public virtual void Publish(Type eventType, object eventSource, IEventData eventData)
         {
             eventData.EventSource = eventSource;
 
             IDictionary<Type, IEventHandlerFactory[]> dict = EventStore.GetHandlers(eventType);
-            foreach (var typeItem in dict)
+            if (dict.Count == 0)
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<Type, IEventHandlerFactory[]> typeItem in dict)
             {
                 foreach (IEventHandlerFactory factory in typeItem.Value)
                 {
-                    InvokeHandler(factory, eventType, eventData, wait);
+                    InvokeHandler(factory, eventType, eventData);
                 }
             }
+
+            Logger.LogDebug($"触发 {eventType} 事件类型，事件源 {eventSource?.GetType()} 的总线事件");
         }
 
         /// <summary>
@@ -244,10 +244,9 @@ namespace OSharp.EventBuses
         /// </summary>
         /// <typeparam name="TEventData">事件数据类型</typeparam>
         /// <param name="eventData">事件数据</param>
-        /// <param name="wait">是否等待结果返回</param>
-        public virtual Task PublishAsync<TEventData>(TEventData eventData, bool wait = true) where TEventData : IEventData
+        public virtual Task PublishAsync<TEventData>(TEventData eventData) where TEventData : IEventData
         {
-            return PublishAsync<TEventData>(null, eventData, wait);
+            return PublishAsync<TEventData>(null, eventData);
         }
 
         /// <summary>
@@ -256,10 +255,9 @@ namespace OSharp.EventBuses
         /// <typeparam name="TEventData">事件数据类型</typeparam>
         /// <param name="eventSource">事件源，触发事件的对象</param>
         /// <param name="eventData">事件数据</param>
-        /// <param name="wait">是否等待结果返回</param>
-        public virtual Task PublishAsync<TEventData>(object eventSource, TEventData eventData, bool wait = true) where TEventData : IEventData
+        public virtual Task PublishAsync<TEventData>(object eventSource, TEventData eventData) where TEventData : IEventData
         {
-            return PublishAsync(typeof(TEventData), eventSource, eventData, wait);
+            return PublishAsync(typeof(TEventData), eventSource, eventData);
         }
 
         /// <summary>
@@ -267,10 +265,9 @@ namespace OSharp.EventBuses
         /// </summary>
         /// <param name="eventType">事件数据类型</param>
         /// <param name="eventData">事件数据</param>
-        /// <param name="wait">是否等待结果返回</param>
-        public virtual Task PublishAsync(Type eventType, IEventData eventData, bool wait = true)
+        public virtual Task PublishAsync(Type eventType, IEventData eventData)
         {
-            return PublishAsync(eventType, null, eventData, wait);
+            return PublishAsync(eventType, null, eventData);
         }
 
         /// <summary>
@@ -279,19 +276,25 @@ namespace OSharp.EventBuses
         /// <param name="eventType">事件数据类型</param>
         /// <param name="eventSource">事件源，触发事件的对象</param>
         /// <param name="eventData">事件数据</param>
-        /// <param name="wait">是否等待结果返回</param>
-        public virtual async Task PublishAsync(Type eventType, object eventSource, IEventData eventData, bool wait = true)
+        public virtual async Task PublishAsync(Type eventType, object eventSource, IEventData eventData)
         {
             eventData.EventSource = eventSource;
 
             IDictionary<Type, IEventHandlerFactory[]> dict = EventStore.GetHandlers(eventType);
+            if (dict.Count == 0)
+            {
+                return;
+            }
+
             foreach (var typeItem in dict)
             {
                 foreach (IEventHandlerFactory factory in typeItem.Value)
                 {
-                    await InvokeHandlerAsync(factory, eventType, eventData, wait);
+                    await InvokeHandlerAsync(factory, eventType, eventData);
                 }
             }
+
+            Logger.LogDebug($"触发 {eventType} 事件类型，事件源 {eventSource?.GetType()} 的总线事件");
         }
 
         /// <summary>
@@ -300,8 +303,7 @@ namespace OSharp.EventBuses
         /// <param name="factory">事件处理器工厂</param>
         /// <param name="eventType">事件类型</param>
         /// <param name="eventData">事件数据</param>
-        /// <param name="wait">是否等待结果返回</param>
-        protected void InvokeHandler(IEventHandlerFactory factory, Type eventType, IEventData eventData, bool wait = true)
+        protected void InvokeHandler(IEventHandlerFactory factory, Type eventType, IEventData eventData)
         {
             EventHandlerDisposeWrapper handlerWrapper = factory.GetHandler();
             IEventHandler handler = handlerWrapper.EventHandler;
@@ -312,21 +314,8 @@ namespace OSharp.EventBuses
                     Logger.LogWarning($"事件源“{eventData.GetType()}”的事件处理器无法找到");
                     return;
                 }
-                if (!handler.CanHandle(eventData))
-                {
-                    return;
-                }
-                if (wait)
-                {
-                    Run(factory, handler, eventType, eventData);
-                }
-                else
-                {
-                    Task.Run(() =>
-                    {
-                        Run(factory, handler, eventType, eventData);
-                    });
-                }
+
+                Run(handler, eventType, eventData);
             }
             finally
             {
@@ -340,9 +329,8 @@ namespace OSharp.EventBuses
         /// <param name="factory">事件处理器工厂</param>
         /// <param name="eventType">事件类型</param>
         /// <param name="eventData">事件数据</param>
-        /// <param name="wait">是否等待结果返回</param>
         /// <returns></returns>
-        protected virtual Task InvokeHandlerAsync(IEventHandlerFactory factory, Type eventType, IEventData eventData, bool wait = true)
+        protected virtual async Task InvokeHandlerAsync(IEventHandlerFactory factory, Type eventType, IEventData eventData)
         {
             EventHandlerDisposeWrapper handlerWrapper = factory.GetHandler();
             IEventHandler handler = handlerWrapper.EventHandler;
@@ -351,21 +339,10 @@ namespace OSharp.EventBuses
                 if (handler == null)
                 {
                     Logger.LogWarning($"事件源“{eventData.GetType()}”的事件处理器无法找到");
-                    return Task.FromResult(0);
+                    return;
                 }
-                if (!handler.CanHandle(eventData))
-                {
-                    return Task.FromResult(0);
-                }
-                if (wait)
-                {
-                    return RunAsync(factory, handler, eventType, eventData);
-                }
-                Task.Run(async () =>
-                {
-                    await RunAsync(factory, handler, eventType, eventData);
-                });
-                return Task.FromResult(0);
+
+                await RunAsync(handler, eventType, eventData);
             }
             finally
             {
@@ -373,7 +350,7 @@ namespace OSharp.EventBuses
             }
         }
 
-        private void Run(IEventHandlerFactory factory, IEventHandler handler, Type eventType, IEventData eventData)
+        private void Run(IEventHandler handler, Type eventType, IEventData eventData)
         {
             try
             {
@@ -383,22 +360,23 @@ namespace OSharp.EventBuses
             {
                 string msg = $"执行事件“{eventType.Name}”的处理器“{handler.GetType()}”时引发异常：{ex.Message}";
                 Logger.LogError(ex, msg);
+                throw;
             }
         }
 
-        private Task RunAsync(IEventHandlerFactory factory, IEventHandler handler, Type eventType, IEventData eventData)
+        private async Task RunAsync(IEventHandler handler, Type eventType, IEventData eventData)
         {
             try
             {
                 ICancellationTokenProvider cancellationTokenProvider = _serviceProvider.GetService<ICancellationTokenProvider>();
-                return handler.HandleAsync(eventData, cancellationTokenProvider.Token);
+                await handler.HandleAsync(eventData, cancellationTokenProvider.Token);
             }
             catch (Exception ex)
             {
                 string msg = $"执行事件“{eventType.Name}”的处理器“{handler.GetType()}”时引发异常：{ex.Message}";
                 Logger.LogError(ex, msg);
+                throw;
             }
-            return Task.FromResult(0);
         }
 
         #endregion

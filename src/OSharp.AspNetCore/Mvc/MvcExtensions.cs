@@ -16,11 +16,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
-using OSharp.Core.Functions;
+using OSharp.Authorization;
+using OSharp.Authorization.Functions;
 using OSharp.Dependency;
 using OSharp.Exceptions;
 using OSharp.Extensions;
-using OSharp.Security;
 
 
 namespace OSharp.AspNetCore.Mvc
@@ -95,6 +95,7 @@ namespace OSharp.AspNetCore.Mvc
             string area = context.GetAreaName();
             string controller = context.GetControllerName();
             string action = context.GetActionName();
+            // todo: 当权限模块没启用时，应取消权限验证，如何判断权限模块已启用？
             IFunctionHandler functionHandler = provider.GetService<IFunctionHandler>();
             if (functionHandler == null)
             {
@@ -150,7 +151,7 @@ namespace OSharp.AspNetCore.Mvc
         /// <summary>
         /// 检测当前用户是否拥有指定URL的功能权限
         /// </summary>
-        public static bool CheckFunctionAuth(this Controller controller, string url)
+        public static bool CheckFunctionAuth(this ControllerBase controller, string url)
         {
             IFunction function = controller.GetFunction(url);
             if (function == null)
@@ -164,7 +165,7 @@ namespace OSharp.AspNetCore.Mvc
         /// <summary>
         /// 检测当前用户是否有指定功能的功能权限
         /// </summary>
-        public static bool CheckFunctionAuth(this Controller controller, string actionName, string controllerName, string areaName = null)
+        public static bool CheckFunctionAuth(this ControllerBase controller, string actionName, string controllerName, string areaName = null)
         {
             IServiceProvider provider = controller.HttpContext.RequestServices;
             IFunctionHandler functionHandler = provider.GetService<IFunctionHandler>();

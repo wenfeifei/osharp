@@ -1,4 +1,4 @@
-// -----------------------------------------------------------------------
+﻿// -----------------------------------------------------------------------
 //  <copyright file="DbContextBase.cs" company="OSharp开源团队">
 //      Copyright (c) 2014-2019 OSharp. All rights reserved.
 //  </copyright>
@@ -14,12 +14,16 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using OSharp.Audits;
 using OSharp.Core.Options;
 using OSharp.EventBuses;
+using OSharp.Extensions;
+using OSharp.Reflection;
+
 
 namespace OSharp.Entity
 {
@@ -29,27 +33,26 @@ namespace OSharp.Entity
     public abstract class DbContextBase : DbContext, IDbContext
     {
         private readonly IEntityManager _entityManager;
-        private readonly ILogger _logger;
         private readonly OsharpDbContextOptions _osharpDbOptions;
         private readonly IServiceProvider _serviceProvider;
 
         /// <summary>
         /// 初始化一个<see cref="DbContextBase"/>类型的新实例
         /// </summary>
-        protected DbContextBase(DbContextOptions options, IEntityManager entityManager, IServiceProvider serviceProvider)
+        protected DbContextBase(DbContextOptions options, IServiceProvider serviceProvider)
             : base(options)
         {
-            _entityManager = entityManager;
             _serviceProvider = serviceProvider;
+            _entityManager = serviceProvider.GetService<IEntityManager>();
             _osharpDbOptions = serviceProvider?.GetOSharpOptions()?.DbContexts?.Values.FirstOrDefault(m => m.DbContextType == GetType());
-            _logger = serviceProvider?.GetLogger(GetType());
+            Logger = serviceProvider.GetLogger(this);
         }
 
         /// <summary>
-        /// 获取或设置 当前上下文所在工作单元，为null将使用EF自动事务而不启用手动事务
+        /// 获取 日志对象
         /// </summary>
-        public IUnitOfWork UnitOfWork { get; set; }
-
+        protected ILogger Logger { get; }
+        
         /// <summary>
         ///     将在此上下文中所做的所有更改保存到数据库中，同时自动开启事务或使用现有同连接事务
         /// </summary>
@@ -72,10 +75,10 @@ namespace OSharp.Entity
         public override int SaveChanges()
         {
             IList<AuditEntityEntry> auditEntities = new List<AuditEntityEntry>();
-            if (_osharpDbOptions?.AuditEntityEnabled == true)
+            if (_osharpDbOptions.AuditEntityEnabled == true)
             {
                 IAuditEntityProvider auditEntityProvider = _serviceProvider.GetService<IAuditEntityProvider>();
-                auditEntities = auditEntityProvider?.GetAuditEntities(this)?.ToList();
+                auditEntities = auditEntityProvider?.GetAuditEntities(this).ToList();
             }
 
             //开启或使用现有事务
@@ -102,7 +105,7 @@ namespace OSharp.Entity
         ///         <see cref="P:Microsoft.EntityFrameworkCore.ChangeTracking.ChangeTracker.AutoDetectChangesEnabled" />.
         ///     </para>
         ///     <para>
-        ///         不支持同一上下文实例上的多个活动操作。请使用“等待”确保在此上下文上调用其他方法之前任何异步操作都已完成。
+        ///         不支持同一上下文实例上的多个活动操作。请使用“await”确保在此上下文上调用其他方法之前任何异步操作都已完成。
         ///     </para>
         /// </remarks>
         /// <param name="cancellationToken">A <see cref="T:System.Threading.CancellationToken" /> to observe while waiting for the task to complete.</param>
@@ -120,16 +123,35 @@ namespace OSharp.Entity
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = new CancellationToken())
         {
             IList<AuditEntityEntry> auditEntities = new List<AuditEntityEntry>();
-            if (_osharpDbOptions?.AuditEntityEnabled == true)
+            if (_osharpDbOptions.AuditEntityEnabled == true)
             {
                 IAuditEntityProvider auditEntityProvider = _serviceProvider.GetService<IAuditEntityProvider>();
-                auditEntities = auditEntityProvider?.GetAuditEntities(this)?.ToList();
+                auditEntities = auditEntityProvider?.GetAuditEntities(this).ToList();
             }
 
             //开启或使用现有事务
+#if NET5_0
             await BeginOrUseTransactionAsync(cancellationToken);
+#else
+            BeginOrUseTransaction();
+#endif
 
-            int count = await base.SaveChangesAsync(cancellationToken);
+            int count;
+            try
+            {
+                count = await base.SaveChangesAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                string msg = ex.Message;
+                while (ex.InnerException != null)
+                {
+                    msg += $"---{ex.InnerException.Message}";
+                    ex = ex.InnerException;
+                }
+                Logger.LogDebug($"SaveChangesAsync 引发异常：{msg}");
+                throw;
+            }
             if (count > 0 && auditEntities?.Count > 0)
             {
                 AuditEntityEventData eventData = new AuditEntityEventData(auditEntities);
@@ -148,27 +170,25 @@ namespace OSharp.Entity
         /// </summary>
         public void BeginOrUseTransaction()
         {
-            if (UnitOfWork == null)
-            {
-                return;
-            }
-
-            UnitOfWork.BeginOrUseTransaction();
+            IUnitOfWork unitOfWork = _serviceProvider.GetService<IUnitOfWork>();
+            unitOfWork?.BeginOrUseTransaction(this);
         }
 
+#if NET5_0
+        
         /// <summary>
         /// 异步开启或使用现有事务
         /// </summary>
         public async Task BeginOrUseTransactionAsync(CancellationToken cancellationToken)
         {
-            if (UnitOfWork == null)
+            IUnitOfWork unitOfWork = _serviceProvider.GetService<IUnitOfWork>();
+            if (unitOfWork != null)
             {
-                return;
+                await unitOfWork.BeginOrUseTransactionAsync(this, cancellationToken);
             }
-
-            await UnitOfWork.BeginOrUseTransactionAsync(cancellationToken);
         }
-
+        
+#endif
         /// <summary>
         /// 创建上下文数据模型时，对各个实体类的数据库映射细节进行配置
         /// </summary>
@@ -181,12 +201,26 @@ namespace OSharp.Entity
             foreach (IEntityRegister register in registers)
             {
                 register.RegisterTo(modelBuilder);
-                _logger?.LogDebug($"将实体类“{register.EntityType}”注册到上下文“{contextType}”中");
+                Logger.LogDebug($"将实体类 {register.EntityType} 注册到上下文 {contextType} 中");
             }
+            Logger.LogInformation($"上下文 {contextType} 注册了{registers.Length}个实体类");
 
-            _logger?.LogInformation($"上下文“{contextType}”注册了{registers.Length}个实体类");
+            // 应用批量实体配置
+            List<IMutableEntityType> mutableEntityTypes = modelBuilder.Model.GetEntityTypes().ToList();
+            IEntityBatchConfiguration[] entityBatchConfigurations =
+                _serviceProvider.GetServices<IEntityBatchConfiguration>().ToArray();
+            if (entityBatchConfigurations.Length > 0)
+            {
+                foreach (IMutableEntityType mutableEntityType in mutableEntityTypes)
+                {
+                    foreach (IEntityBatchConfiguration entityBatchConfiguration in entityBatchConfigurations)
+                    {
+                        entityBatchConfiguration.Configure(modelBuilder, mutableEntityType);
+                    }
+                }
+            }
         }
-
+        
         ///// <summary>
         ///// 模型配置
         ///// </summary>
@@ -198,18 +232,5 @@ namespace OSharp.Entity
         //        optionsBuilder.UseLazyLoadingProxies();
         //    }
         //}
-
-        #region Overrides of DbContext
-
-        /// <summary>
-        ///     Releases the allocated resources for this context.
-        /// </summary>
-        public override void Dispose()
-        {
-            base.Dispose();
-            UnitOfWork = null;
-        }
-
-        #endregion
     }
 }

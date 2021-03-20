@@ -7,34 +7,37 @@
 //  <last-date>2018-06-27 4:49</last-date>
 // -----------------------------------------------------------------------
 
-using Liuliu.Demo.Common.Dtos;
-using Liuliu.Demo.Identity;
-using Liuliu.Demo.Identity.Dtos;
-using Liuliu.Demo.Identity.Entities;
-using Liuliu.Demo.Security;
-using Liuliu.Demo.Security.Dtos;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using OSharp.AspNetCore.Mvc;
-using OSharp.AspNetCore.Mvc.Filters;
-using OSharp.AspNetCore.UI;
-using OSharp.Caching;
-using OSharp.Collections;
-using OSharp.Core.Functions;
-using OSharp.Core.Modules;
-using OSharp.Data;
-using OSharp.Extensions;
-using OSharp.Filter;
-using OSharp.Identity;
-using OSharp.Mapping;
-using OSharp.Security;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
+
+using Liuliu.Demo.Authorization;
+using Liuliu.Demo.Authorization.Dtos;
+using Liuliu.Demo.Common.Dtos;
+using Liuliu.Demo.Identity;
+using Liuliu.Demo.Identity.Dtos;
+using Liuliu.Demo.Identity.Entities;
+
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+
+using OSharp.AspNetCore.Mvc;
+using OSharp.AspNetCore.Mvc.Filters;
+using OSharp.AspNetCore.UI;
+using OSharp.Authorization;
+using OSharp.Authorization.Functions;
+using OSharp.Authorization.Modules;
+using OSharp.Caching;
+using OSharp.Collections;
+using OSharp.Data;
+using OSharp.Entity;
+using OSharp.Extensions;
+using OSharp.Filter;
+using OSharp.Identity;
+using OSharp.Mapping;
 
 
 namespace Liuliu.Demo.Web.Areas.Admin.Controllers
@@ -46,19 +49,18 @@ namespace Liuliu.Demo.Web.Areas.Admin.Controllers
         private readonly IIdentityContract _identityContract;
         private readonly ICacheService _cacheService;
         private readonly IFilterService _filterService;
-        private readonly SecurityManager _securityManager;
         private readonly UserManager<User> _userManager;
+        private readonly FunctionAuthManager _functionAuthManager;
 
         public UserController(
             UserManager<User> userManager,
-            SecurityManager securityManager,
+            FunctionAuthManager functionAuthManager,
             IIdentityContract identityContract,
-            ILoggerFactory loggerFactory,
             ICacheService cacheService,
             IFilterService filterService)
         {
             _userManager = userManager;
-            _securityManager = securityManager;
+            _functionAuthManager = functionAuthManager;
             _identityContract = identityContract;
             _cacheService = cacheService;
             _filterService = filterService;
@@ -79,16 +81,25 @@ namespace Liuliu.Demo.Web.Areas.Admin.Controllers
             Func<User, bool> updateFunc = _filterService.GetDataFilterExpression<User>(null, DataAuthOperation.Update).Compile();
             Func<User, bool> deleteFunc = _filterService.GetDataFilterExpression<User>(null, DataAuthOperation.Delete).Compile();
             Expression<Func<User, bool>> predicate = _filterService.GetExpression<User>(request.FilterGroup);
-            var page = _cacheService.ToPageCache(_userManager.Users, predicate, request.PageCondition, m => new
+
+            //查询某一角色的所有用户
+            //var roleId = request.FilterGroup.Rules.FirstOrDefault(m => m.Field == "RoleId")?.CastTo(0);
+            //if (roleId != 0)
+            //{
+            //    predicate = predicate.And(m => m.UserRoles.Any(n => n.RoleId == roleId));
+            //}
+
+            var page = _userManager.Users.ToPage(predicate, request.PageCondition, m => new
             {
                 D = m,
                 Roles = m.UserRoles.Select(n => n.Role.Name)
-            }, function).ToPageResult(data => data.Select(m => new UserOutputDto(m.D)
+            }).ToPageResult(data => data.Select(m => new UserOutputDto(m.D)
             {
                 Roles = m.Roles.ToArray(),
                 Updatable = updateFunc(m.D),
                 Deletable = deleteFunc(m.D)
             }).ToArray());
+            
             return page.ToPageData();
         }
 
@@ -226,7 +237,7 @@ namespace Liuliu.Demo.Web.Areas.Admin.Controllers
         [Description("设置模块")]
         public async Task<AjaxResult> SetModules(UserSetModuleDto dto)
         {
-            OperationResult result = await _securityManager.SetUserModules(dto.UserId, dto.ModuleIds);
+            OperationResult result = await _functionAuthManager.SetUserModules(dto.UserId, dto.ModuleIds);
             return result.ToAjaxResult();
         }
     }

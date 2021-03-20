@@ -20,16 +20,9 @@ namespace Liuliu.Demo.Identity.Entities
     /// 实体类：用户登录日志
     /// </summary>
     [Description("用户登录日志")]
+    [TableNamePrefix("Identity")]
     public class LoginLog : EntityBase<Guid>, ICreatedTime
     {
-        /// <summary>
-        /// 初始化一个<see cref="LoginLog"/>类型的新实例
-        /// </summary>
-        public LoginLog()
-        {
-            Id = CombGuid.NewGuid();
-        }
-
         /// <summary>
         /// 获取或设置 登录IP
         /// </summary>

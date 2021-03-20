@@ -7,6 +7,9 @@
 //  <last-date>2018-12-14 23:28</last-date>
 // -----------------------------------------------------------------------
 
+using System.Collections.Generic;
+
+
 namespace OSharp.Core.Options
 {
     /// <summary>
@@ -14,24 +17,24 @@ namespace OSharp.Core.Options
     /// </summary>
     public class SwaggerOptions
     {
-        /// <summary>
-        /// 获取或设置 标题
-        /// </summary>
+        public ICollection<SwaggerEndpoint> Endpoints { get; set; } = new List<SwaggerEndpoint>();
+
+        public string RoutePrefix { get; set; }
+
+        public bool IsHideSchemas { get; set; } = false;
+
+        public bool MiniProfiler { get; set; } = true;
+
+        public bool Enabled { get; set; }
+    }
+
+
+    public class SwaggerEndpoint
+    {
         public string Title { get; set; }
 
-        /// <summary>
-        /// 获取或设置 版本
-        /// </summary>
-        public int Version { get; set; }
+        public string Version { get; set; }
 
-        /// <summary>
-        /// 获取或设置 Url
-        /// </summary>
         public string Url { get; set; }
-
-        /// <summary>
-        /// 获取或设置 是否启用
-        /// </summary>
-        public bool Enabled { get; set; }
     }
 }

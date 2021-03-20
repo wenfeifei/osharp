@@ -18,9 +18,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 
 using OSharp.AspNetCore.Mvc;
+using OSharp.Authorization.Functions;
+using OSharp.Authorization.Modules;
 using OSharp.Caching;
-using OSharp.Core.Functions;
-using OSharp.Core.Modules;
 using OSharp.Core.Packs;
 using OSharp.Filter;
 using OSharp.Reflection;
@@ -52,7 +52,7 @@ namespace Liuliu.Demo.Web.Areas.Admin.Controllers
         /// <returns></returns>
         [HttpPost]
         [ModuleInfo]
-        [Description("读取模块包")]
+        [Description("读取")]
         public PageData<PackOutputDto> Read(PageRequest request)
         {
             request.AddDefaultSortCondition(
@@ -62,13 +62,13 @@ namespace Liuliu.Demo.Web.Areas.Admin.Controllers
             IFunction function = this.GetExecuteFunction();
             Expression<Func<OsharpPack, bool>> exp = _filterService.GetExpression<OsharpPack>(request.FilterGroup);
             IServiceProvider provider = HttpContext.RequestServices;
-            IOsharpPackManager manager = provider.GetService<IOsharpPackManager>();
-            return _cacheService.ToPageCache(manager.SourcePacks.AsQueryable(), exp,
+
+            return _cacheService.ToPageCache(provider.GetAllPacks().AsQueryable(), exp,
                 request.PageCondition,
                 m => new PackOutputDto()
                 {
                     Name = m.GetType().Name,
-                    Display = m.GetType().GetDescription(false),
+                    Display = m.GetType().GetDescription(true),
                     Class = m.GetType().FullName,
                     Level = m.Level,
                     Order = m.Order,

@@ -50,6 +50,16 @@ namespace OSharp.Core.Options
         public JwtOptions Jwt { get; set; }
 
         /// <summary>
+        /// 获取或设置 Cookie身份认证选项
+        /// </summary>
+        public CookieOptions Cookie { get; set; }
+
+        /// <summary>
+        /// 获取或设置 Cors选项
+        /// </summary>
+        public CorsOptions Cors { get; set; }
+
+        /// <summary>
         /// 获取或设置 Redis选项
         /// </summary>
         public RedisOptions Redis { get; set; }
@@ -58,6 +68,11 @@ namespace OSharp.Core.Options
         /// 获取或设置 Swagger选项
         /// </summary>
         public SwaggerOptions Swagger { get; set; }
+
+        /// <summary>
+        /// 获取或设置 Http传输加密选项
+        /// </summary>
+        public HttpEncryptOptions HttpEncrypt { get; set; }
 
         /// <summary>
         /// 获取指定上下文类和指定数据库类型的上下文配置信息

@@ -7,12 +7,15 @@
 //  <last-date>2018-12-15 19:10</last-date>
 // -----------------------------------------------------------------------
 
+using System;
 using System.Collections.Generic;
 using System.Data;
 
 using Dapper;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 
 namespace OSharp.Entity
@@ -27,12 +30,19 @@ namespace OSharp.Entity
         /// <summary>
         /// 初始化一个<see cref="SqlExecutorBase{TEntity,TKey}"/>类型的新实例
         /// </summary>
-        protected SqlExecutorBase(IUnitOfWorkManager unitOfWorkManager)
+        protected SqlExecutorBase(IServiceProvider provider)
         {
-            DbContext dbContext = (DbContext)unitOfWorkManager.GetDbContext<TEntity, TKey>();
+            DbContext dbContext = (DbContext)provider.GetDbContext<TEntity, TKey>();
             _connectionString = dbContext.Database.GetDbConnection().ConnectionString;
+
+            Logger = provider.GetLogger(GetType());
         }
-        
+
+        /// <summary>
+        /// 获取 日志对象
+        /// </summary>
+        protected ILogger Logger { get; }
+
         /// <summary>
         /// 获取 数据库类型
         /// </summary>
@@ -56,7 +66,9 @@ namespace OSharp.Entity
         {
             using (IDbConnection db = GetDbConnection(_connectionString))
             {
-                return db.Query<TResult>(sql, param);
+                IEnumerable<TResult> result = db.Query<TResult>(sql, param);
+                Logger.LogDebug($"使用Dapper执行Sql查询：{sql}");
+                return result;
             }
         }
 
@@ -70,7 +82,9 @@ namespace OSharp.Entity
         {
             using (IDbConnection db = GetDbConnection(_connectionString))
             {
-                return db.Execute(sql, param);
+                Logger.LogDebug($"使用Dapper执行Sql命令：{sql}");
+                int count = db.Execute(sql, param);
+                return count;
             }
         }
     }

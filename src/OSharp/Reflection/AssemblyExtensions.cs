@@ -13,7 +13,6 @@ using System.Reflection;
 
 using Microsoft.Extensions.DependencyModel;
 
-using OSharp.Collections;
 using OSharp.Extensions;
 
 
@@ -41,7 +40,12 @@ namespace OSharp.Reflection
         {
             assembly.CheckNotNull("assembly");
             FileVersionInfo info = FileVersionInfo.GetVersionInfo(assembly.Location);
-            return info.ProductVersion;
+            string version = info.ProductVersion;
+            if (version.Contains("+"))
+            {
+                version = version.ReplaceRegex(@"\+(\w+)?", "");
+            }
+            return version;
         }
 
         /// <summary>

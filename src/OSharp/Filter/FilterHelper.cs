@@ -13,16 +13,17 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Security.Claims;
+
+using OSharp.Authorization;
 using OSharp.Data;
 using OSharp.Dependency;
 using OSharp.Entity;
 using OSharp.Exceptions;
 using OSharp.Extensions;
+using OSharp.Identity;
 using OSharp.Linq;
 using OSharp.Properties;
 using OSharp.Reflection;
-using OSharp.Security;
-using OSharp.Security.Claims;
 
 
 namespace OSharp.Filter
@@ -387,6 +388,7 @@ namespace OSharp.Filter
             //}
             if (rule.Value?.ToString() == UserFlagAttribute.Token)
             {
+                // todo: 将UserFlag之类的功能提升为接口进行服务注册，好方便实现自定义XXXFlag
                 if (rule.Operate != FilterOperate.Equal)
                 {
                     throw new OsharpException($"当前用户“{rule.Value}”只能用在“{FilterOperate.Equal.ToDescription()}”操作中");

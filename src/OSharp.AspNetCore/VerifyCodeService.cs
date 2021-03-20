@@ -13,10 +13,8 @@ using System.Drawing.Imaging;
 using System.IO;
 
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.DependencyInjection;
 
 using OSharp.Data;
-using OSharp.Dependency;
 using OSharp.Extensions;
 
 
@@ -25,7 +23,6 @@ namespace OSharp.AspNetCore
     /// <summary>
     /// 验证码处理服务
     /// </summary>
-    [Dependency(ServiceLifetime.Singleton, TryAdd = true)]
     public class VerifyCodeService : IVerifyCodeService
     {
         private const string Separator = "#$#";
@@ -66,12 +63,12 @@ namespace OSharp.AspNetCore
         /// <summary>
         /// 设置验证码到Session中
         /// </summary>
-        public void SetCode(string code, out string id)
+        public string SetCode(string code, int seconds = 60 * 3)
         {
-            id = Guid.NewGuid().ToString("N");
+            string id = Guid.NewGuid().ToString("N");
             string key = $"{OsharpConstants.VerifyCodeKeyPrefix}_{id}";
-            const int seconds = 60 * 3;
             _cache.SetString(key, code, new DistributedCacheEntryOptions() { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(seconds) });
+            return id;
         }
 
         /// <summary>

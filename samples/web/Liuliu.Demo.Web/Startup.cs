@@ -1,25 +1,29 @@
-﻿// -----------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //  <copyright file="Startup.cs" company="OSharp开源团队">
-//      Copyright (c) 2014-2018 OSharp. All rights reserved.
+//      Copyright (c) 2014-2020 OSharp. All rights reserved.
 //  </copyright>
 //  <site>http://www.osharp.org</site>
 //  <last-editor>郭明锋</last-editor>
-//  <last-date>2018-06-27 4:50</last-date>
+//  <last-date>2020-03-26 21:47</last-date>
 // -----------------------------------------------------------------------
 
+using Liuliu.Demo.Authorization;
+using Liuliu.Demo.Identity;
+using Liuliu.Demo.Infos;
+using Liuliu.Demo.Systems;
 using Liuliu.Demo.Web.Startups;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-#if NETCOREAPP3_0
 using Microsoft.Extensions.Hosting;
-#endif
-using Microsoft.Extensions.Logging;
 
 using OSharp.AspNetCore;
-using OSharp.Core.Builders;
-using OSharp.Entity;
+using OSharp.AspNetCore.Routing;
+using OSharp.AutoMapper;
+using OSharp.Log4Net;
+using OSharp.MiniProfiler;
+using OSharp.Swagger;
 
 
 namespace Liuliu.Demo.Web
@@ -29,35 +33,49 @@ namespace Liuliu.Demo.Web
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddOSharp<AspOsharpPackManager>();
+#if NET5_0
+            services.AddDatabaseDeveloperPageExceptionFilter();
+#endif
+            services.AddOSharp()
+                .AddPack<Log4NetPack>()
+                .AddPack<AutoMapperPack>()
+                .AddPack<EndpointsPack>()
+                .AddPack<MiniProfilerPack>()
+                .AddPack<SwaggerPack>()
+                //.AddPack<RedisPack>()
+                .AddPack<AuthenticationPack>()
+                .AddPack<FunctionAuthorizationPack>()
+                .AddPack<DataAuthorizationPack>()
+                .AddPack<SqlServerDefaultDbContextMigrationPack>()
+                .AddPack<AuditPack>()
+                .AddPack<InfosPack>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-#if NETCOREAPP3_0
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)
-
-#else
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
-
-#endif
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
+#if NET5_0
+                app.UseMigrationsEndPoint();
+#else
                 app.UseDatabaseErrorPage();
+#endif
             }
             else
             {
                 app.UseExceptionHandler("/#/500");
-                app.UseHsts().UseHttpsRedirection();
+                app.UseHsts();
+                //app.UseHttpsRedirection(); // 启用HTTPS
             }
 
-            app
-                //.UseMiddleware<NodeNoFoundHandlerMiddleware>()
-                .UseMiddleware<NodeExceptionHandlerMiddleware>()
-                .UseDefaultFiles()
-                .UseStaticFiles()
-                .UseOSharp();
+            //app.UseMiddleware<HostHttpCryptoMiddleware>();
+            //app.UseMiddleware<JsonNoFoundHandlerMiddleware>();
+            app.UseMiddleware<JsonExceptionHandlerMiddleware>();
+            app.UseDefaultFiles();
+            app.UseStaticFiles();
+            app.UseOSharp();
         }
     }
 }

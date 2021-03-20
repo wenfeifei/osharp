@@ -1,4 +1,4 @@
-﻿// -----------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //  <copyright file="RoleController.cs" company="OSharp开源团队">
 //      Copyright (c) 2014-2018 OSharp. All rights reserved.
 //  </copyright>
@@ -14,11 +14,11 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 
+using Liuliu.Demo.Authorization;
+using Liuliu.Demo.Authorization.Dtos;
 using Liuliu.Demo.Identity;
 using Liuliu.Demo.Identity.Dtos;
 using Liuliu.Demo.Identity.Entities;
-using Liuliu.Demo.Security;
-using Liuliu.Demo.Security.Dtos;
 
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -26,11 +26,10 @@ using Microsoft.AspNetCore.Mvc;
 using OSharp.AspNetCore.Mvc;
 using OSharp.AspNetCore.Mvc.Filters;
 using OSharp.AspNetCore.UI;
+using OSharp.Authorization.Functions;
+using OSharp.Authorization.Modules;
 using OSharp.Caching;
 using OSharp.Collections;
-using OSharp.Core;
-using OSharp.Core.Functions;
-using OSharp.Core.Modules;
 using OSharp.Data;
 using OSharp.Entity;
 using OSharp.Filter;
@@ -45,20 +44,20 @@ namespace Liuliu.Demo.Web.Areas.Admin.Controllers
     public class RoleController : AdminApiController
     {
         private readonly IIdentityContract _identityContract;
+        private readonly FunctionAuthManager _functionAuthorizationManager;
         private readonly ICacheService _cacheService;
         private readonly IFilterService _filterService;
         private readonly RoleManager<Role> _roleManager;
-        private readonly SecurityManager _securityManager;
 
         public RoleController(RoleManager<Role> roleManager,
-            SecurityManager securityManager,
             IIdentityContract identityContract,
+            FunctionAuthManager functionAuthorizationManager,
             ICacheService cacheService,
             IFilterService filterService)
         {
             _roleManager = roleManager;
-            _securityManager = securityManager;
             _identityContract = identityContract;
+            _functionAuthorizationManager = functionAuthorizationManager;
             _cacheService = cacheService;
             _filterService = filterService;
         }
@@ -212,10 +211,10 @@ namespace Liuliu.Demo.Web.Areas.Admin.Controllers
         [DependOnFunction("ReadRoleModules", Controller = "Module")]
         [UnitOfWork]
         [Description("设置模块")]
-        public async Task<ActionResult> SetModules(RoleSetModuleDto dto)
+        public async Task<AjaxResult> SetModules(RoleSetModuleDto dto)
         {
-            OperationResult result = await _securityManager.SetRoleModules(dto.RoleId, dto.ModuleIds);
-            return Json(result.ToAjaxResult());
+            OperationResult result = await _functionAuthorizationManager.SetRoleModules(dto.RoleId, dto.ModuleIds);
+            return result.ToAjaxResult();
         }
     }
 }

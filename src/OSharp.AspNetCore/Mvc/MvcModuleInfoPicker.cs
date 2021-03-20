@@ -9,13 +9,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 
 using Microsoft.AspNetCore.Mvc;
 
-using OSharp.Core.Functions;
-using OSharp.Core.Modules;
+using OSharp.Authorization.Functions;
+using OSharp.Authorization.Modules;
 using OSharp.Exceptions;
 using OSharp.Reflection;
 
@@ -82,7 +83,8 @@ namespace OSharp.AspNetCore.Mvc
             {
                 AreaAttribute areaAttr = type.GetAttribute<AreaAttribute>();
                 area = areaAttr?.RouteValue ?? "Site";
-                name = area == "Site" ? "站点" : area;
+                DisplayNameAttribute display = type.GetAttribute<DisplayNameAttribute>();
+                name = display?.DisplayName ?? area;
             }
             info = new ModuleInfo()
             {
@@ -131,7 +133,7 @@ namespace OSharp.AspNetCore.Mvc
             foreach (DependOnFunctionAttribute dependOnAttr in dependOnAttrs)
             {
                 string dependArea = dependOnAttr.Area == null ? area : dependOnAttr.Area == string.Empty ? null : dependOnAttr.Area;
-                string dependController = dependOnAttr.Controller ?? controller;
+                string dependController = dependOnAttr.Controller?.Replace("Controller", string.Empty) ?? controller;
                 IFunction function = FunctionHandler.GetFunction(dependArea, dependController, dependOnAttr.Action);
                 if (function == null)
                 {

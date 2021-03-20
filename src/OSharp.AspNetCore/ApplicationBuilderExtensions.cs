@@ -8,13 +8,16 @@
 // -----------------------------------------------------------------------
 
 using System;
+using System.Diagnostics;
 
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OSharp.AspNetCore;
 using OSharp.Core.Packs;
-using OSharp.Exceptions;
+using OSharp.Logging;
+using OSharp.Reflection;
 
 
 namespace Microsoft.AspNetCore.Builder
@@ -30,11 +33,34 @@ namespace Microsoft.AspNetCore.Builder
         public static IApplicationBuilder UseOSharp(this IApplicationBuilder app)
         {
             IServiceProvider provider = app.ApplicationServices;
-            if (!(provider.GetService<IOsharpPackManager>() is IAspUsePack aspPackManager))
+            ILogger logger = provider.GetLogger("ApplicationBuilderExtensions");
+            logger.LogInformation(0, "OSharp框架初始化开始");
+
+            // 输出注入服务的日志
+            StartupLogger startupLogger = provider.GetService<StartupLogger>();
+            startupLogger.Output(provider);
+
+            Stopwatch watch = Stopwatch.StartNew();
+            OsharpPack[] packs = provider.GetAllPacks();
+            logger.LogInformation($"共有 {packs.Length} 个Pack模块需要初始化");
+            foreach (OsharpPack pack in packs)
             {
-                throw new OsharpException("接口 IOsharpPackManager 的注入类型不正确，该类型应同时实现接口 IAspUsePack");
+                Type packType = pack.GetType();
+                string packName = packType.GetDescription();
+                logger.LogInformation($"正在初始化模块 “{packName} ({packType.Name})”");
+                if (pack is AspOsharpPack aspPack)
+                {
+                    aspPack.UsePack(app);
+                }
+                else
+                {
+                    pack.UsePack(provider);
+                }
+                logger.LogInformation($"模块 “{packName} ({packType.Name})” 初始化完成\n");
             }
-            aspPackManager.UsePack(app);
+
+            watch.Stop();
+            logger.LogInformation(0, $"OSharp框架初始化完成，耗时：{watch.Elapsed}\r\n");
 
             return app;
         }
@@ -54,22 +80,23 @@ namespace Microsoft.AspNetCore.Builder
             });
         }
 
-#if NETCOREAPP3_0
-
         /// <summary>
         /// 添加Endpoint并Area路由支持
         /// </summary>
-        public static IEndpointRouteBuilder MvcEndpointsWithAreaRoute(this IEndpointRouteBuilder endpoints, bool area = true)
+        public static IEndpointRouteBuilder MapControllersWithAreaRoute(this IEndpointRouteBuilder endpoints, bool area = true)
         {
             if (area)
             {
-                endpoints.MapControllerRoute("area", "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+                endpoints.MapControllerRoute(
+                    name: "areas-router",
+                    pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
             }
 
-            endpoints.MapDefaultControllerRoute();
+            endpoints.MapControllerRoute(
+                name: "default",
+                pattern: "{controller=Home}/{action=Index}/{id?}");
+
             return endpoints;
         }
-
-#endif
     }
 }

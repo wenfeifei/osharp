@@ -1,4 +1,4 @@
-﻿// -----------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //  <copyright file="HangfireJobRunner.cs" company="OSharp开源团队">
 //      Copyright (c) 2014-2018 OSharp. All rights reserved.
 //  </copyright>
@@ -7,11 +7,8 @@
 //  <last-date>2018-12-31 17:36</last-date>
 // -----------------------------------------------------------------------
 
-#if NETCOREAPP2_2
-
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -77,14 +74,16 @@ namespace Liuliu.Demo.Web.Hangfire
             User user2 = await userManager.FindByIdAsync("2");
             list.Add($"user2.IsLocked: {user2.IsLocked}");
             user2.IsLocked = !user2.IsLocked;
+            IUnitOfWork unitOfWork = _provider.GetUnitOfWork(true);
             await userManager.UpdateAsync(user2);
-            IUnitOfWork unitOfWork = _provider.GetUnitOfWork<User, int>();
+#if NET5_0
+            await unitOfWork.CommitAsync();
+#else
             unitOfWork.Commit();
+#endif
             user2 = await userManager.FindByIdAsync("2");
             list.Add($"user2.IsLocked: {user2.IsLocked}");
             return list.ExpandAndToString();
         }
     }
 }
-
-#endif

@@ -15,8 +15,13 @@ using Microsoft.Extensions.Options;
 
 using OSharp.Caching;
 using OSharp.Core.Options;
+using OSharp.Core.Systems;
 using OSharp.Entity;
 using OSharp.Filter;
+using OSharp.Http;
+using OSharp.Logging;
+using OSharp.Net;
+using OSharp.Threading;
 
 
 namespace OSharp.Core.Packs
@@ -40,12 +45,18 @@ namespace OSharp.Core.Packs
         public override IServiceCollection AddServices(IServiceCollection services)
         {
             services.TryAddSingleton<IConfigureOptions<OsharpOptions>, OsharpOptionsSetup>();
-            services.TryAddSingleton<IEntityTypeFinder, EntityTypeFinder>();
-            services.TryAddSingleton<IInputDtoTypeFinder, InputDtoTypeFinder>();
-            services.TryAddSingleton<IOutputDtoTypeFinder, OutputDtoTypeFinder>();
+            services.TryAddSingleton<ICancellationTokenProvider, NoneCancellationTokenProvider>();
+            services.TryAddSingleton<IEmailSender, DefaultEmailSender>();
+            services.TryAddSingleton<StartupLogger>();
 
             services.TryAddSingleton<ICacheService, CacheService>();
             services.TryAddScoped<IFilterService, FilterService>();
+            services.TryAddScoped<IKeyValueStore, KeyValueStore>();
+
+            services.TryAddTransient<IClientHttpCrypto, ClientHttpCrypto>();
+            services.AddTransient<ClientHttpCryptoHandler>();
+
+            services.AddDistributedMemoryCache();
 
             return services;
         }

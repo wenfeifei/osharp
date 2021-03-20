@@ -1,4 +1,4 @@
-﻿// -----------------------------------------------------------------------
+// -----------------------------------------------------------------------
 //  <copyright file="IdentityController.cs" company="OSharp开源团队">
 //      Copyright (c) 2014-2019 OSharp. All rights reserved.
 //  </copyright>
@@ -24,11 +24,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using OSharp.AspNetCore;
-using OSharp.AspNetCore.Mvc;
 using OSharp.AspNetCore.Mvc.Filters;
 using OSharp.AspNetCore.UI;
-using OSharp.Core;
-using OSharp.Core.Modules;
+using OSharp.Authorization;
+using OSharp.Authorization.Modules;
 using OSharp.Data;
 using OSharp.Entity;
 using OSharp.Extensions;
@@ -39,14 +38,13 @@ using OSharp.Identity.OAuth2;
 using OSharp.Json;
 using OSharp.Mapping;
 using OSharp.Net;
-using OSharp.Security.Claims;
 
 
 namespace Liuliu.Demo.Web.Controllers
 {
     [Description("网站-认证")]
     [ModuleInfo(Order = 1)]
-    public class IdentityController : ApiController
+    public class IdentityController : SiteApiControllerBase
     {
         private readonly IIdentityContract _identityContract;
         private readonly SignInManager<User> _signInManager;
@@ -73,11 +71,7 @@ namespace Liuliu.Demo.Web.Controllers
         [Description("用户名是否存在")]
         public bool CheckUserNameExists(string userName)
         {
-#if NETCOREAPP3_0
             bool exists = _userManager.Users.Any(m => m.NormalizedUserName == _userManager.NormalizeName(userName));
-#else
-            bool exists = _userManager.Users.Any(m => m.NormalizedUserName == _userManager.NormalizeKey(userName));
-#endif
             return exists;
         }
 
@@ -90,11 +84,7 @@ namespace Liuliu.Demo.Web.Controllers
         [Description("用户Email是否存在")]
         public bool CheckEmailExists(string email)
         {
-#if NETCOREAPP3_0
             bool exists = _userManager.Users.Any(m => m.NormalizeEmail == _userManager.NormalizeEmail(email));
-#else
-            bool exists = _userManager.Users.Any(m => m.NormalizeEmail == _userManager.NormalizeKey(email));
-#endif
             return exists;
         }
 
@@ -191,9 +181,13 @@ namespace Liuliu.Demo.Web.Controllers
             dto.Ip = HttpContext.GetClientIp();
             dto.UserAgent = Request.Headers["User-Agent"].FirstOrDefault();
 
+            IUnitOfWork unitOfWork = HttpContext.RequestServices.GetUnitOfWork(true);
             OperationResult<User> result = await _identityContract.Login(dto);
-            IUnitOfWork unitOfWork = HttpContext.RequestServices.GetUnitOfWork<User, int>();
+#if NET5_0
+            await unitOfWork.CommitAsync();
+#else
             unitOfWork.Commit();
+#endif
 
             if (!result.Succeeded)
             {
@@ -206,50 +200,17 @@ namespace Liuliu.Demo.Web.Controllers
         }
 
         /// <summary>
-        /// Jwt登录
-        /// </summary>
-        /// <param name="dto">登录信息</param>
-        /// <returns>JSON操作结果</returns>
-        [HttpPost]
-        [ModuleInfo]
-        [Description("JWT登录")]
-        public async Task<AjaxResult> Jwtoken(LoginDto dto)
-        {
-            Check.NotNull(dto, nameof(dto));
-
-            if (!ModelState.IsValid)
-            {
-                return new AjaxResult("提交信息验证失败", AjaxResultType.Error);
-            }
-
-            dto.Ip = HttpContext.GetClientIp();
-            dto.UserAgent = Request.Headers["User-Agent"].FirstOrDefault();
-
-            OperationResult<User> result = await _identityContract.Login(dto);
-            IUnitOfWork unitOfWork = HttpContext.RequestServices.GetUnitOfWork<User, int>();
-            unitOfWork.Commit();
-
-            if (!result.Succeeded)
-            {
-                return result.ToAjaxResult();
-            }
-
-            User user = result.Data;
-            JsonWebToken token = await CreateJwtToken(user);
-            return new AjaxResult("登录成功", AjaxResultType.Success, token);
-        }
-
-        /// <summary>
         /// 获取身份认证Token
         /// </summary>
         /// <param name="dto">TokenDto</param>
         /// <returns>JSON操作结果</returns>
         [HttpPost]
         [ModuleInfo]
-        [Description("JwtToken")]
+        [Description("Token")]
         public async Task<AjaxResult> Token(TokenDto dto)
         {
-            if (dto.GrantType == GrantType.Password)
+            string grantType = dto.GrantType?.UpperToLowerAndSplit("_");
+            if (grantType == GrantType.Password)
             {
                 Check.NotNull(dto.Account, nameof(dto.Account));
                 Check.NotNull(dto.Password, nameof(dto.Password));
@@ -262,20 +223,24 @@ namespace Liuliu.Demo.Web.Controllers
                     UserAgent = Request.Headers["User-Agent"].FirstOrDefault()
                 };
 
+                IUnitOfWork unitOfWork = HttpContext.RequestServices.GetUnitOfWork(true);
                 OperationResult<User> result = await _identityContract.Login(loginDto);
-                IUnitOfWork unitOfWork = HttpContext.RequestServices.GetUnitOfWork<User, int>();
+#if NET5_0
+                await unitOfWork.CommitAsync();
+#else
                 unitOfWork.Commit();
+#endif
                 if (!result.Succeeded)
                 {
                     return result.ToAjaxResult();
                 }
 
                 User user = result.Data;
-                JsonWebToken token = await CreateJwtToken(user);
+                JsonWebToken token = await CreateJwtToken(user, dto.ClientType);
                 return new AjaxResult("登录成功", AjaxResultType.Success, token);
             }
 
-            if (dto.GrantType == GrantType.RefreshToken)
+            if (grantType == GrantType.RefreshToken)
             {
                 Check.NotNull(dto.RefreshToken, nameof(dto.RefreshToken));
                 JsonWebToken token = await CreateJwtToken(dto.RefreshToken);
@@ -314,7 +279,7 @@ namespace Liuliu.Demo.Web.Controllers
             if (remoteError != null)
             {
                 Logger.LogError($"第三方登录错误：{remoteError}");
-                return Json(new AjaxResult($"第三方登录错误：{remoteError}", AjaxResultType.UnAuth));
+                throw new Exception($"第三方登录错误：{remoteError}");
             }
 
             string url;
@@ -338,7 +303,7 @@ namespace Liuliu.Demo.Web.Controllers
                 return Redirect(url);
             }
 
-            Logger.LogInformation($"用户“{info.Principal.Identity.Name}”通过 {info.ProviderDisplayName} OAuth2登录成功");
+            Logger.LogInformation($"用户“{info.Principal.Identity?.Name}”通过 {info.ProviderDisplayName} OAuth2登录成功");
             JsonWebToken token = await CreateJwtToken((User)result.Data);
             url = $"/#/passport/oauth-callback?token={token.ToJsonString()}";
             return Redirect(url);
@@ -373,9 +338,13 @@ namespace Liuliu.Demo.Web.Controllers
         public async Task<AjaxResult> LoginBind(UserLoginInfoEx loginInfo)
         {
             loginInfo.RegisterIp = HttpContext.GetClientIp();
+            IUnitOfWork unitOfWork = HttpContext.RequestServices.GetUnitOfWork(true);
             OperationResult<User> result = await _identityContract.LoginBind(loginInfo);
-            IUnitOfWork unitOfWork = HttpContext.RequestServices.GetUnitOfWork<User, int>();
+#if NET5_0
+            await unitOfWork.CommitAsync();
+#else
             unitOfWork.Commit();
+#endif
             if (!result.Succeeded)
             {
                 return result.ToAjaxResult();
@@ -395,9 +364,13 @@ namespace Liuliu.Demo.Web.Controllers
         public async Task<AjaxResult> LoginOneKey(UserLoginInfoEx loginInfo)
         {
             loginInfo.RegisterIp = HttpContext.GetClientIp();
+            IUnitOfWork unitOfWork = HttpContext.RequestServices.GetUnitOfWork(true);
             OperationResult<User> result = await _identityContract.LoginOneKey(loginInfo.ProviderKey);
-            IUnitOfWork unitOfWork = HttpContext.RequestServices.GetUnitOfWork<User, int>();
+#if NET5_0
+            await unitOfWork.CommitAsync();
+#else
             unitOfWork.Commit();
+#endif
 
             if (!result.Succeeded)
             {
@@ -409,11 +382,11 @@ namespace Liuliu.Demo.Web.Controllers
             return new AjaxResult("登录成功", AjaxResultType.Success, token);
         }
 
-        private async Task<JsonWebToken> CreateJwtToken(User user)
+        private async Task<JsonWebToken> CreateJwtToken(User user, RequestClientType clientType = RequestClientType.Browser)
         {
             IServiceProvider provider = HttpContext.RequestServices;
-            IJwtBearerService jwtBearerService = provider.GetService<IJwtBearerService>();
-            JsonWebToken token = await jwtBearerService.CreateToken(user.Id.ToString(), user.UserName);
+            IJwtBearerService jwtBearerService = provider.GetRequiredService<IJwtBearerService>();
+            JsonWebToken token = await jwtBearerService.CreateToken(user.Id.ToString(), user.UserName, clientType);
 
             return token;
         }
@@ -421,7 +394,7 @@ namespace Liuliu.Demo.Web.Controllers
         private async Task<JsonWebToken> CreateJwtToken(string refreshToken)
         {
             IServiceProvider provider = HttpContext.RequestServices;
-            IJwtBearerService jwtBearerService = provider.GetService<IJwtBearerService>();
+            IJwtBearerService jwtBearerService = provider.GetRequiredService<IJwtBearerService>();
             JsonWebToken token = await jwtBearerService.RefreshToken(refreshToken);
             return token;
         }
@@ -450,7 +423,7 @@ namespace Liuliu.Demo.Web.Controllers
         [UnitOfWork]
         public async Task<AjaxResult> Logout()
         {
-            if (!User.Identity.IsAuthenticated)
+            if (User.Identity?.IsAuthenticated != true)
             {
                 return new AjaxResult("用户登出成功");
             }
@@ -469,7 +442,7 @@ namespace Liuliu.Demo.Web.Controllers
         [Description("用户信息")]
         public async Task<OnlineUser> Profile()
         {
-            if (!User.Identity.IsAuthenticated)
+            if (User.Identity?.IsAuthenticated != true)
             {
                 return null;
             }
@@ -642,7 +615,7 @@ namespace Liuliu.Demo.Web.Controllers
 
             string token = await _userManager.GeneratePasswordResetTokenAsync(user);
             token = UrlBase64ReplaceChar(token);
-            IEmailSender sender = HttpContext.RequestServices.GetService<IEmailSender>();
+            IEmailSender sender = HttpContext.RequestServices.GetRequiredService<IEmailSender>();
             string url = $"{Request.Scheme}://{Request.Host}/#/passport/reset-password?userId={user.Id}&token={token}";
             string body = $"亲爱的用户 <strong>{user.NickName}</strong>[{user.UserName}]，您好！<br>"
                 + $"欢迎使用柳柳软件账户密码重置功能，请 <a href=\"{url}\" target=\"_blank\"><strong>点击这里</strong></a><br>"
@@ -680,7 +653,7 @@ namespace Liuliu.Demo.Web.Controllers
 
         private async Task SendMailAsync(string email, string subject, string body)
         {
-            IEmailSender sender = HttpContext.RequestServices.GetService<IEmailSender>();
+            IEmailSender sender = HttpContext.RequestServices.GetRequiredService<IEmailSender>();
             await sender.SendEmailAsync(email, subject, body);
         }
 

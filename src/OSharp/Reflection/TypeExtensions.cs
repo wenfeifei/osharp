@@ -1,4 +1,4 @@
-// -----------------------------------------------------------------------
+﻿// -----------------------------------------------------------------------
 //  <copyright file="TypeExtensions.cs" company="OSharp开源团队">
 //      Copyright (c) 2014-2015 OSharp. All rights reserved.
 //  </copyright>
@@ -214,13 +214,38 @@ namespace OSharp.Reflection
         }
 
         /// <summary>
-        /// 方法是否是异步
+        /// 判断当前类型是否为指定类型泛型
         /// </summary>
-        public static bool IsAsync(this MethodInfo method)
+        public static bool IsGenericFor(this Type type, Type forArgType)
         {
-            return method.ReturnType == typeof(Task)
-                || method.ReturnType.IsGenericType && method.ReturnType.GetGenericTypeDefinition() == typeof(Task<>);
+            if (!type.IsGenericType)
+            {
+                return false;
+            }
+
+            Type[] argTypes = type.GetGenericArguments();
+            if (argTypes.Length == 0)
+            {
+                return false;
+            }
+
+            Type arg1 = argTypes[0];
+
+            if (forArgType.IsGenericType)
+            {
+                
+            }
+
+            throw new NotImplementedException();
         }
+
+        ///// <summary>
+        ///// 判断当前类型是否为指定类型泛型
+        ///// </summary>
+        //public static bool IsGenericFor<TArgType>()
+        //{
+
+        //}
 
         /// <summary>
         /// 返回当前类型是否是指定基类的派生类
@@ -250,6 +275,15 @@ namespace OSharp.Reflection
         }
 
         /// <summary>
+        /// 方法是否是异步
+        /// </summary>
+        public static bool IsAsync(this MethodInfo method)
+        {
+            return method.ReturnType == typeof(Task)
+                || method.ReturnType.IsGenericType && method.ReturnType.GetGenericTypeDefinition() == typeof(Task<>);
+        }
+
+        /// <summary>
         /// 返回当前方法信息是否是重写方法
         /// </summary>
         /// <param name="method">要判断的方法信息</param>
@@ -257,6 +291,20 @@ namespace OSharp.Reflection
         public static bool IsOverridden(this MethodInfo method)
         {
             return method.GetBaseDefinition().DeclaringType != method.DeclaringType;
+        }
+
+        /// <summary>
+        /// 返回当前属性信息是否为virtual
+        /// </summary>
+        public static bool IsVirtual(this PropertyInfo property)
+        {
+            var accessor = property.GetAccessors().FirstOrDefault();
+            if (accessor == null)
+            {
+                return false;
+            }
+
+            return accessor.IsVirtual && !accessor.IsFinal;
         }
 
         /// <summary>

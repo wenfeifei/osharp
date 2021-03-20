@@ -15,17 +15,13 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
-using OSharp.Audits;
 using OSharp.Collections;
-using OSharp.Core.EntityInfos;
-using OSharp.Core.Functions;
+using OSharp.Core.Options;
 using OSharp.Data;
-using OSharp.Dependency;
 using OSharp.Exceptions;
 
 
@@ -56,40 +52,81 @@ namespace OSharp.Entity
         /// <summary>
         /// 获取未提交的迁移记录并提交迁移
         /// </summary>
-        public static void CheckAndMigration(this DbContext dbContext)
+        public static void CheckAndMigration(this DbContext dbContext, ILogger logger = null)
         {
             string[] migrations = dbContext.Database.GetPendingMigrations().ToArray();
             if (migrations.Length > 0)
             {
                 dbContext.Database.Migrate();
-                ILoggerFactory loggerFactory = dbContext.GetService<ILoggerFactory>();
-                ILogger logger = loggerFactory.CreateLogger("OSharp.Entity.DbContextExtensions");
-                logger.LogInformation($"已提交{migrations.Length}条挂起的迁移记录：{migrations.ExpandAndToString()}");
+                logger?.LogInformation($"已提交{migrations.Length}条挂起的迁移记录：{migrations.ExpandAndToString()}");
             }
         }
 
         /// <summary>
         /// 执行指定的Sql语句
         /// </summary>
-        public static int ExecuteSqlCommand(this IDbContext dbContext, string sql, params object[] parameters)
+        public static int ExecuteSqlRaw(this IDbContext dbContext, string sql, params object[] parameters)
         {
             if (!(dbContext is DbContext context))
             {
-                throw new OsharpException($"参数dbContext类型为“{dbContext.GetType()}”，不能转换为 DbContext");
+                throw new OsharpException($"参数dbContext类型为 {dbContext.GetType()} ，不能转换为 DbContext");
             }
-            return context.Database.ExecuteSqlCommand(new RawSqlString(sql), parameters);
+            return context.Database.ExecuteSqlRaw(sql, parameters);
         }
 
         /// <summary>
         /// 异步执行指定的Sql语句
         /// </summary>
-        public static Task<int> ExecuteSqlCommandAsync(this IDbContext dbContext, string sql, params object[] parameters)
+        public static Task<int> ExecuteSqlRawAsync(this IDbContext dbContext, string sql, params object[] parameters)
         {
             if (!(dbContext is DbContext context))
             {
-                throw new OsharpException($"参数dbContext类型为“{dbContext.GetType()}”，不能转换为 DbContext");
+                throw new OsharpException($"参数dbContext类型为 {dbContext.GetType()} ，不能转换为 DbContext");
             }
-            return context.Database.ExecuteSqlCommandAsync(new RawSqlString(sql), parameters);
+            return context.Database.ExecuteSqlRawAsync(sql, parameters);
+        }
+
+        /// <summary>
+        /// 执行指定的格式化Sql语句
+        /// </summary>
+        public static int ExecuteSqlInterpolated(this IDbContext dbContext, FormattableString sql)
+        {
+            if (!(dbContext is DbContext context))
+            {
+                throw new OsharpException($"参数dbContext类型为 {dbContext.GetType()} ，不能转换为 DbContext");
+            }
+            return context.Database.ExecuteSqlInterpolated(sql);
+        }
+
+        /// <summary>
+        /// 异步执行指定的格式化Sql语句
+        /// </summary>
+        public static Task<int> ExecuteSqlInterpolatedAsync(this IDbContext dbContext, FormattableString sql)
+        {
+            if (!(dbContext is DbContext context))
+            {
+                throw new OsharpException($"参数dbContext类型为 {dbContext.GetType()} ，不能转换为 DbContext");
+            }
+            return context.Database.ExecuteSqlInterpolatedAsync(sql);
+        }
+
+        /// <summary>
+        /// 获取实体上下文所属的数据库类型
+        /// </summary>
+        public static DatabaseType GetDatabaseType(this IDbContext dbContext)
+        {
+            if (!(dbContext is DbContext context))
+            {
+                throw new OsharpException($"参数dbContext类型为 {dbContext.GetType()} ，不能转换为 DbContext");
+            }
+
+            OsharpOptions options = context.GetService<IOptions<OsharpOptions>>()?.Value;
+            if (options != null)
+            {
+                return options.DbContexts.First(m => m.Value.DbContextType == context.GetType()).Value.DatabaseType;
+            }
+
+            return DatabaseType.SqlServer;
         }
 
         /// <summary>
@@ -121,6 +158,18 @@ namespace OSharp.Entity
                     TEntity oldEntity = set.Find(entity.Id);
                     context.Entry(oldEntity).CurrentValues.SetValues(entity);
                 }
+            }
+        }
+
+        /// <summary>
+        /// 清除数据上下文的更改
+        /// </summary>
+        public static void CleanChanges(this DbContext context)
+        {
+            IEnumerable<EntityEntry> entries = context.ChangeTracker.Entries();
+            foreach (var entry in entries)
+            {
+                entry.State = EntityState.Detached;
             }
         }
     }

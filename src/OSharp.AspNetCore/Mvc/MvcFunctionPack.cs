@@ -14,10 +14,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-using OSharp.Core.Functions;
-using OSharp.Core.Modules;
+using OSharp.Authorization.Functions;
+using OSharp.Authorization.Modules;
 using OSharp.Core.Packs;
-using OSharp.Dependency;
 
 
 namespace OSharp.AspNetCore.Mvc
@@ -25,7 +24,7 @@ namespace OSharp.AspNetCore.Mvc
     /// <summary>
     /// MVC功能点模块
     /// </summary>
-    [DependsOnPacks(typeof(AspNetCorePack))]
+    [DependsOnPacks(typeof(MvcPack))]
     [Description("MVC功能点模块")]
     public class MvcFunctionPack : AspOsharpPack
     {
@@ -41,7 +40,6 @@ namespace OSharp.AspNetCore.Mvc
         /// <returns></returns>
         public override IServiceCollection AddServices(IServiceCollection services)
         {
-            services.GetOrAddTypeFinder<IFunctionTypeFinder>(assemblyFinder => new MvcControllerTypeFinder(assemblyFinder));
             services.AddSingleton<IFunctionHandler, MvcFunctionHandler>();
             services.TryAddSingleton<IModuleInfoPicker, MvcModuleInfoPicker>();
 

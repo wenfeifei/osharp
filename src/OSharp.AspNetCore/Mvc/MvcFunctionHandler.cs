@@ -9,6 +9,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 using Microsoft.AspNetCore.Authorization;
@@ -16,8 +17,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 
 using OSharp.AspNetCore.Mvc.Filters;
-using OSharp.Core;
-using OSharp.Core.Functions;
+using OSharp.Authorization;
+using OSharp.Authorization.Functions;
+using OSharp.Collections;
 using OSharp.Exceptions;
 using OSharp.Reflection;
 
@@ -34,20 +36,37 @@ namespace OSharp.AspNetCore.Mvc
         /// </summary>
         public MvcFunctionHandler(IServiceProvider serviceProvider)
             : base(serviceProvider)
+        { }
+        
+        /// <summary>
+        /// 获取所有功能类型
+        /// </summary>
+        /// <returns></returns>
+        public override Type[] GetAllFunctionTypes()
         {
-            FunctionTypeFinder = serviceProvider.GetService<IFunctionTypeFinder>();
-            MethodInfoFinder = new MvcMethodInfoFinder();
+            return AssemblyManager.FindTypes(m => m.IsController());
         }
 
         /// <summary>
-        /// 获取 功能类型查找器
+        /// 查找指定功能的所有功能点方法  
         /// </summary>
-        public override IFunctionTypeFinder FunctionTypeFinder { get; }
+        /// <param name="functionType">功能类型</param>
+        /// <returns></returns>
+        public override MethodInfo[] GetMethodInfos(Type functionType)
+        {
+            List<Type> types = new List<Type>();
+            while (functionType.IsController())
+            {
+                types.AddIfNotExist(functionType);
+                functionType = functionType?.BaseType;
+                if (functionType == null || functionType.Name == "Controller" || functionType.Name == "ControllerBase")
+                {
+                    break;
+                }
+            }
 
-        /// <summary>
-        /// 获取 功能方法查找器
-        /// </summary>
-        public override IMethodInfoFinder MethodInfoFinder { get; }
+            return types.SelectMany(m => m.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)).ToArray();
+        }
 
         /// <summary>
         /// 重写以实现从功能类型创建功能信息
@@ -60,7 +79,7 @@ namespace OSharp.AspNetCore.Mvc
             {
                 throw new OsharpException($"类型“{controllerType.FullName}”不是MVC控制器类型");
             }
-            FunctionAccessType accessType = controllerType.HasAttribute<LoggedInAttribute>() || controllerType.HasAttribute<AuthorizeAttribute>()
+            FunctionAccessType accessType = controllerType.HasAttribute<LoggedInAttribute>()
                 ? FunctionAccessType.LoggedIn
                 : controllerType.HasAttribute<RoleLimitAttribute>()
                     ? FunctionAccessType.RoleLimit
@@ -84,7 +103,7 @@ namespace OSharp.AspNetCore.Mvc
         /// <returns></returns>
         protected override Function GetFunction(Function typeFunction, MethodInfo method)
         {
-            FunctionAccessType accessType = method.HasAttribute<LoggedInAttribute>() || method.HasAttribute<AuthorizeAttribute>()
+            FunctionAccessType accessType = method.HasAttribute<LoggedInAttribute>()
                 ? FunctionAccessType.LoggedIn
                 : method.HasAttribute<AllowAnonymousAttribute>()
                     ? FunctionAccessType.Anonymous
@@ -113,14 +132,19 @@ namespace OSharp.AspNetCore.Mvc
         /// <returns></returns>
         protected override bool IsIgnoreMethod(Function action, MethodInfo method, IEnumerable<Function> functions)
         {
-            bool flag = base.IsIgnoreMethod(action, method, functions);
-            return flag && method.HasAttribute<HttpPostAttribute>() || method.HasAttribute<NonActionAttribute>();
+            if (method.HasAttribute<NonActionAttribute>() || method.HasAttribute<NonFunctionAttribute>())
+            {
+                return true;
+            }
+
+            Function existing = GetFunction(functions, action.Area, action.Controller, action.Action, action.Name);
+            return existing != null && method.HasAttribute<HttpPostAttribute>();
         }
 
         /// <summary>
         /// 从类型中获取功能的区域信息
         /// </summary>
-        private static string GetArea(Type type)
+        private static string GetArea(MemberInfo type)
         {
             AreaAttribute attribute = type.GetAttribute<AreaAttribute>();
             return attribute?.RouteValue;
